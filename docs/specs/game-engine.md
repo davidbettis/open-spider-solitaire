@@ -87,8 +87,8 @@ enum SuitMode: Int, Codable, Sendable {
 Three layers, deliberately separated:
 
 - **`Board`** — the mutable-by-value core: `tableau` (10 columns), `stock`, `completedRuns`. Pure data + pure rule methods. This is what undo snapshots.
-- **`GameState`** — `Codable` aggregate = `Board` + lifetime counters + mode + elapsed + undo stack + `schemaVersion`. This is what persistence serializes.
-- **`GameSession`** — `@MainActor @Observable final class` wrapping a `GameState`, exposing intent methods (`tap`, `move`, `deal`, `undo`, `newGame`) and derived values (`displayScore`, `isWon`) to the UI.
+- **`GameState`** — `Codable` aggregate = `Board` + `initialBoard` (the deal as first laid out) + lifetime counters + mode + elapsed + undo stack + `schemaVersion`. This is what persistence serializes.
+- **`GameSession`** — `@MainActor @Observable final class` wrapping a `GameState`, exposing intent methods (`tap`, `move`, `deal`, `undo`, `restart`, `newGame`) and derived values (`displayScore`, `isWon`) to the UI.
 
 ```swift
 struct Board: Hashable, Codable, Sendable {
@@ -105,7 +105,7 @@ struct CompletedRun: Hashable, Codable, Sendable {
 }
 
 struct GameState: Codable, Sendable {
-    static let currentSchemaVersion = 1
+    static let currentSchemaVersion = 2   // v2 added initialBoard
     var schemaVersion = GameState.currentSchemaVersion
     var mode: SuitMode
     var board: Board
@@ -301,7 +301,7 @@ protocol DealProvider: Sendable {                               // §6.1
 
 ## 14. State & Serialization Contract
 
-- `GameState` is `Codable` and self-describing via `schemaVersion` (currently `1`).
+- `GameState` is `Codable` and self-describing via `schemaVersion` (currently `2`; v2 added `initialBoard`, the deal as first laid out, so Restart can replay it).
 - The engine only *reads/writes* the versioned value; **migration is executed by `persistence-and-migration`**, which, on version mismatch, either migrates forward or fails gracefully (never corrupts a running app — PRD).
 - Invariants the engine guarantees for any `GameState` it emits: 104-card multiset matches `mode`; `stock.count % 10 == 0`; `tableau.count == 10`; `undoStack` entries are structurally valid boards.
 

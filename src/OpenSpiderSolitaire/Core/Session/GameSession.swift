@@ -112,6 +112,14 @@ final class GameSession {
         if isWon { pause() }
     }
 
+    /// Replay the current deal from the beginning: the same cards, with score,
+    /// counters, undo history, and timer all reset. Distinct from
+    /// ``newGame(mode:rng:)``, which draws a *different* deal.
+    func restart() {
+        state = GameState(mode: state.mode, board: state.initialBoard)
+        runningSince = nil
+    }
+
     /// Start a new game, discarding the current one.
     func newGame(mode: SuitMode, rng: inout some RandomNumberGenerator) {
         state = GameState(mode: mode, board: dealProvider.makeDeal(mode: mode, using: &rng))

@@ -1,6 +1,6 @@
 # Feature Spec: Hints & Auto-Complete
 
-- **Status:** Hints implemented; Auto-Complete (§5) still unwired in the UI
+- **Status:** Hints and Auto-Complete implemented. Stepped completion animation waits on [`animations`](./animations.md).
 - **Owner:** TBD
 - **Source PRD:** [`docs/PRD.md`](../PRD.md)
 - **Spec sequence:** #5. Depends on [`game-engine`](./game-engine.md) (legal-move enumeration, auto-complete logic) and [`game-board-ui`](./game-board-ui.md) / [`animations`](./animations.md) (presentation).
@@ -80,11 +80,15 @@ idle ──game state changes (move/deal/undo)──▶ idle           // candid
 ## 5. Auto-Complete
 
 ### 5.1 Availability
-Bind to engine `session.canAutoComplete` (§10 engine spec: stock empty, all cards face-up, greedily solvable). When it flips true, present a non-intrusive **"Finish game"** affordance (button/banner).
+Bind to engine `session.canAutoComplete` (§10 engine spec: stock empty, all cards face-up, greedily solvable). When it flips true, a **"Finish Game"** capsule (`FinishGameButton`) fades in over the bottom of the tableau, so nothing in the board or the bars reflows.
+
+Two implementation notes:
+- The UI also requires `!session.isWon`. A won board satisfies `canAutoComplete` vacuously — stock empty, nothing face-down, and the solver returns an empty move list — so without the guard the affordance would sit under the win overlay.
+- `canAutoComplete` runs a full greedy solve on every access once the stock empties, so the board view caches it and recomputes only when the board changes, never per view update.
 
 ### 5.2 Execution
 - On tap, call `session.autoComplete()`. The engine replays its greedy solution, mutating state to the won board with **no** counter changes (points-neutral).
-- The UI sequences the finishing moves with animation (glide + run-clear celebration, then the win cascade) via [`animations`](./animations.md).
+- **v1 completes instantly**: `autoComplete()` applies the whole greedy solution in one mutation, so the board jumps to the won state and the win overlay follows. Sequencing the finishing moves as visible motion needs both a move-by-move engine hook and the primitives in [`animations`](./animations.md); neither exists yet.
 - Auto-complete is not undoable step-by-step in v1 (it ends the game); undo semantics for the pre-auto-complete state are out of scope unless AI-2 decides otherwise.
 
 ## 6. Interaction Rules
@@ -107,8 +111,8 @@ Bind to engine `session.canAutoComplete` (§10 engine spec: stock empty, all car
 - [x] A board mutation (move/deal/undo) exits the hint cycle.
 - [x] With no legal moves, Hint is an inert no-op.
 - [x] Hints cost 0 points and never touch `moveCount`/`undoCount`/score; the timer keeps running during a hint.
-- [ ] The auto-complete affordance appears exactly when `session.canAutoComplete` is true.
-- [ ] `autoComplete()` finishes to a win with 0 point cost.
+- [x] The auto-complete affordance appears exactly when `session.canAutoComplete` is true and the game is not already won.
+- [x] `autoComplete()` finishes to a win with 0 point cost.
 
 ## 9. Testing Strategy
 
@@ -119,7 +123,7 @@ Bind to engine `session.canAutoComplete` (§10 engine spec: stock empty, all car
 ## 10. Open Questions / Action Items
 
 - ~~**AI-1:** Hint preview style~~ — **resolved**: gliding ghost run + destination ring, positioned from `BoardLayout`.
-- **AI-2:** Should the pre-auto-complete board be restorable via undo after auto-complete, or is auto-complete terminal? (v1: terminal.)
+- **AI-2:** Should the pre-auto-complete board be restorable via undo after auto-complete, or is auto-complete terminal? (v1: terminal — `autoComplete()` pushes no undo snapshots.)
 - ~~**AI-3:** Cap the number of hint candidates cycled~~ — **resolved**: no cap; the cycle walks every legal move, since hints enumerate rather than rank.
 
 ## 11. PRD Traceability

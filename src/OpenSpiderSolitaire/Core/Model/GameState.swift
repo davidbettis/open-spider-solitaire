@@ -9,11 +9,16 @@ import Foundation
 struct GameState: Codable, Sendable {
     /// Bump when the persisted shape changes; migration is handled by the
     /// persistence layer, not the engine.
-    static let currentSchemaVersion = 1
+    /// v2 added `initialBoard` so Restart can replay the same deal.
+    static let currentSchemaVersion = 2
 
     var schemaVersion: Int
     var mode: SuitMode
     var board: Board
+
+    /// The board exactly as first dealt. Kept so Restart can replay this deal;
+    /// ``GameSession/newGame(mode:rng:)`` draws a different one.
+    var initialBoard: Board
 
     /// Monotonic count of committed forward moves (never decremented by undo).
     var moveCount: Int
@@ -32,6 +37,7 @@ struct GameState: Codable, Sendable {
     init(
         mode: SuitMode,
         board: Board,
+        initialBoard: Board? = nil,
         moveCount: Int = 0,
         undoCount: Int = 0,
         elapsed: TimeInterval = 0,
@@ -42,6 +48,7 @@ struct GameState: Codable, Sendable {
         self.schemaVersion = schemaVersion
         self.mode = mode
         self.board = board
+        self.initialBoard = initialBoard ?? board
         self.moveCount = moveCount
         self.undoCount = undoCount
         self.elapsed = elapsed

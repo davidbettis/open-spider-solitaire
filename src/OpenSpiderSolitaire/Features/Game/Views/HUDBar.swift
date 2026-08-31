@@ -8,13 +8,10 @@ struct HUDBar: View {
     let onExit: () -> Void
     let onDeal: () -> Void
 
-    /// Height available to the card-shaped zones; the bar adds its own padding.
-    private static let contentHeight: CGFloat = 30
-
     var body: some View {
         GeometryReader { proxy in
             let layout = HUDLayout(containerWidth: proxy.size.width,
-                                   contentHeight: Self.contentHeight)
+                                   contentHeight: HUDLayout.contentHeight)
             // Sequential, not stacked: eight slots plus the deck cannot clear a
             // mathematically centred pair of stats on a phone, so the stats are
             // centred *between* the zones instead — and can never overlap them.
@@ -30,7 +27,7 @@ struct HUDBar: View {
             }
             .frame(width: proxy.size.width, height: proxy.size.height)
         }
-        .frame(height: Self.contentHeight * BoardLayout.aspectRatio)
+        .frame(height: HUDLayout.contentHeight * BoardLayout.aspectRatio)
         .font(.subheadline)
         .foregroundStyle(.white)
         .padding(.horizontal)

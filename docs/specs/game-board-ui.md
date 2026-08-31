@@ -50,7 +50,8 @@ GameBoardView
 │   └─ ColumnView × 10
 │       └─ CardView × n       // fanned; face-down tighter, face-up looser
 ├─ DragLayer (overlay)        // renders the run currently being dragged
-└─ ControlBar                 // bottom: New Game · Undo · Hint (text titles)
+├─ FinishGameButton (overlay) // auto-complete affordance, when available
+└─ ControlBar                 // bottom: New Game · Restart · Undo · Hint
 ```
 
 - `GameBoardView` reads `@Environment(GameSession.self)` (engine) and owns `@State private var drag: DragState?` plus `@State private var confirmingNewGame = false`.
@@ -98,13 +99,15 @@ Only face-up cards that head a valid movable run are interactive; tapping/draggi
 - **Deal:** tap the HUD deck (`DeckIndicator`) → `session.deal()`. The deck is greyed **only when the stock is spent** (`dealsRemaining == 0`); while cards remain it stays live even though the engine refuses to deal onto an empty column. A refused deal **flashes every empty column red** (~0.9s, `BoardInteraction.blockedColumns`) so the block is explained rather than presented as a dead control.
 - **Undo:** `session.undo()`; disabled at game start.
 - **Hint:** text button; starts the hint cycle owned by [`hints-and-autocomplete`](./hints-and-autocomplete.md). While cycling, any tap anywhere cancels.
-- **New Game:** if a game is in progress (any move made and not won), present a confirmation dialog before `session.newGame(...)`; otherwise start immediately.
+- **New Game:** if a game is in progress (any move made and not won), present a confirmation dialog before `session.newGame(...)`; otherwise start immediately. Draws a **different** deal.
+- **Restart:** confirmation dialog, then `session.restart()` — replays the **same** deal from the start, resetting score, counters, undo history, and timer.
+- **Finish Game:** see [`hints-and-autocomplete`](./hints-and-autocomplete.md) §5; shown only while the board is mechanically completable and unwon.
 
 ## 7. HUD
 
 - **Score:** `session.displayScore` (already floored at 0). Updates reactively via `@Observable`.
 - **Timer:** MM:SS from `session.state.elapsed`, ticking once per second **only while running**. Driven by a UI-side `TimelineView(.periodic)` or a 1 Hz timer that reads engine elapsed; the engine remains the source of truth for accumulated time (§11 engine spec). Pauses with the engine.
-- **Completed sets (left):** one card-shaped slot per King→Ace run, eight total, filled left-to-right from `board.completedRuns` in completion order; a filled slot shows that run's suit pip, an empty one a dashed outline. Replaces the former `Sets` text stat.
+- **Completed sets (left):** one card-shaped slot per King→Ace run, eight total, filled left-to-right from `board.completedRuns` in completion order; a filled slot shows that run's suit pip, an empty one a dashed outline. Replaces the former `Sets` text stat. The slots are **fanned at a 0.65 step** (`HUDLayout.slotOverlapStep`), so eight occupy 5.55 card widths rather than 8 and each card is markedly larger than in a side-by-side row. The step also sets how much of each layered slot stays visible: larger leaves more room around the suit pip but widens the fan and shrinks every card, and 0.65 keeps roughly a tenth of a card width of padding on either side of the pip. The **first** slot sits on top and is fully visible; each later slot is layered underneath the one before it, peeking out to the right. So every slot after the first shows only its right half, and the pip is centred in whatever strip is visible.
 - **Deck (right):** `board.dealsRemaining` (0–5) rendered as that many stacked card backs plus a numeric badge, over a persistent empty footprint so the bar does not reflow as the stock drains. Dimmed and inert only when the stock is spent — see §6.3 for the empty-column case.
 - **Menu:** icon-only chevron at the far left, ahead of the slots.
 

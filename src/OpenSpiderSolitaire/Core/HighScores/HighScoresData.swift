@@ -16,12 +16,9 @@ struct ModeStats: Hashable, Codable, Sendable {
 
 /// Everything High Scores owns, as one persistable value (spec §4).
 ///
-/// It carries its own `schemaVersion`: the persistence spec says the durable
-/// payload versions itself independently of `GameState`.
+/// Versioning lives on the envelope that wraps ``DurableData``, not here, so
+/// there is exactly one version to reason about per stored payload.
 struct HighScoresData: Hashable, Codable, Sendable {
-    static let currentSchemaVersion = 1
-
-    var schemaVersion: Int = HighScoresData.currentSchemaVersion
     var leaderboards: [SuitMode: Leaderboard] = [:]
     var stats: [SuitMode: ModeStats] = [:]
 }

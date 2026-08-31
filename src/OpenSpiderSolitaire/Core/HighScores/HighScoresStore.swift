@@ -11,7 +11,7 @@ final class HighScoresStore {
 
     @ObservationIgnored private let storage: any HighScoresStorage
 
-    init(storage: any HighScoresStorage = UserDefaultsHighScoresStorage()) {
+    init(storage: any HighScoresStorage = PersistedHighScoresStorage(persistence: PersistenceService())) {
         self.storage = storage
         self.data = storage.load() ?? HighScoresData()
     }

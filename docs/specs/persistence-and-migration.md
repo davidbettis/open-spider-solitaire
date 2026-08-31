@@ -1,6 +1,6 @@
 # Feature Spec: Persistence & Migration
 
-- **Status:** Draft
+- **Status:** Implemented.
 - **Owner:** TBD
 - **Source PRD:** [`docs/PRD.md`](../PRD.md)
 - **Spec sequence:** #3. Depends on [`game-engine`](./game-engine.md). Serves [`high-scores`](./high-scores.md).
@@ -40,9 +40,9 @@ Two independent stores, chosen by size and write frequency:
 | Store | Payload | Backing | Why |
 |---|---|---|---|
 | **GameSnapshotStore** | `GameState` (can be larger — includes `undoStack`) | JSON file, atomic write, in app **Application Support** | Bigger, written often mid-play; a file with atomic replace avoids `UserDefaults` bloat and partial writes. |
-| **DurableStore** | Settings + high scores (small) | `Codable` blobs in `UserDefaults` (or a small JSON file) | Tiny, infrequent, simple. |
+| **DurableStore** | High scores (small); settings when a settings model exists | JSON file, atomic write, same directory | Tiny and infrequent — but a file, not `UserDefaults`, because `set` there is asynchronous and can lose a write to a hard kill (resolves AI-1). |
 
-Both payloads carry a `schemaVersion`. `GameState.schemaVersion` is defined by the engine (currently `1`); the durable payload defines its own.
+Both payloads carry a `schemaVersion` **on their envelope**, which is the single authority for migration. `GameState.schemaVersion` is defined by the engine (currently `2`); `DurableData.currentSchemaVersion` versions the durable payload.
 
 ## 5. Persisted Envelopes
 
@@ -56,7 +56,7 @@ struct PersistedEnvelope<Body: Codable>: Codable {
 ```
 
 - **Game snapshot:** `PersistedEnvelope<GameState>` (present only while a game is in progress; deleted on win or explicit new-game-discard).
-- **Durable:** `PersistedEnvelope<DurableData>` where `DurableData = { settings, leaderboardsByMode, statsByMode }` (fields owned by [`high-scores`](./high-scores.md)).
+- **Durable:** `PersistedEnvelope<DurableData>`. `DurableData` holds `highScores` (owned by [`high-scores`](./high-scores.md)); settings join it when a settings model exists — none is invented here.
 
 ## 6. Lifecycle
 
@@ -105,7 +105,7 @@ Any of: unreadable file, JSON decode error, unknown/newer version, failed migrat
 
 ## 9. Architecture & Concurrency
 
-- `actor PersistenceService` isolates all disk I/O; public API is `async`.
+- `actor PersistenceService` owns save/load. The **frequent** path — autosaving after every board change — is debounced inside the actor, off the main thread, which is what §9's no-blocking rule is about. Two **rare** paths are deliberately synchronous instead: the single load at launch (so the UI never flashes a menu over a game that is still there) and the save on the way to the background (so it cannot lose a race with termination). Both are sub-millisecond for payloads this size.
   ```swift
   actor PersistenceService {
       func saveGame(_ state: GameState) async
@@ -127,14 +127,14 @@ Any of: unreadable file, JSON decode error, unknown/newer version, failed migrat
 
 ## 11. Acceptance Criteria
 
-- [ ] A mid-game `GameState` (non-empty `undoStack`, non-zero `elapsed`) saved then loaded is byte-for-value identical.
-- [ ] Killing the app during play and relaunching resumes the exact board, score, undo depth, and elapsed time.
-- [ ] Winning or confirming a new game deletes the in-progress snapshot; next launch shows no resumable game.
-- [ ] Durable data (leaderboards, stats, settings) survives a full restart.
-- [ ] A save file with `schemaVersion` below current is migrated stepwise and decodes correctly (fixture-driven).
-- [ ] A corrupt/truncated file, an unknown/newer version, and a throwing migration each result in a clean fallback (deleted snapshot / default durable) with no crash.
-- [ ] A simulated crash mid-write (temp file present, target untouched) leaves the previous good save intact.
-- [ ] All disk I/O is off the main thread; no UI hang under rapid autosave.
+- [x] A mid-game `GameState` (non-empty `undoStack`, non-zero `elapsed`) saved then loaded is byte-for-value identical.
+- [x] Killing the app during play and relaunching resumes the exact board, score, undo depth, and elapsed time — verified in the simulator: after a kill, a relaunch with no autostart came back to a pixel-identical tableau at the same score.
+- [x] Winning or confirming a new game deletes the in-progress snapshot; next launch shows no resumable game.
+- [x] Durable data survives a full restart.
+- [x] A save file with `schemaVersion` below current is migrated stepwise and decodes correctly — `GameStateV1ToV2` is a real migration, not a placeholder: v2 added `initialBoard`, and a v1 save has none.
+- [x] A corrupt/truncated file, well-formed JSON of the wrong shape, a newer version, a missing migration step, and a throwing migration each fall back cleanly with no crash.
+- [x] A simulated crash mid-write (temp file present, target untouched) leaves the previous good save intact.
+- [x] Autosave is debounced and off the main thread; a burst of moves coalesces to one write. The launch load and the background save are synchronous by design — see §9.
 
 ## 12. Testing Strategy
 
@@ -146,9 +146,9 @@ Any of: unreadable file, JSON decode error, unknown/newer version, failed migrat
 
 ## 13. Open Questions / Action Items
 
-- **AI-1:** `UserDefaults` vs. dedicated JSON file for the durable store (leaning file for consistency).
-- **AI-2:** Autosave debounce interval and whether to also snapshot after auto-clears (no player action) — likely yes, since board changed.
-- **AI-3:** Exact background-save budget on iOS (background task assertion) to guarantee the terminate-time save completes.
+- ~~**AI-1:** `UserDefaults` vs. dedicated JSON file for the durable store~~ — **resolved**: file. Beyond consistency, `UserDefaults.set` is asynchronous, so a high score written moments before a hard kill could be lost; an atomic file write has landed by the time `save` returns.
+- ~~**AI-2:** Autosave debounce interval, and whether to snapshot after auto-clears~~ — **resolved**: 500 ms, and yes. Autosave keys off *any* board change, so auto-clears and flips are covered without special-casing. A game with no moves yet is skipped, since resuming an untouched deal is pointless.
+- **AI-3:** Exact background-save budget on iOS. Partly addressed — the background save is synchronous, so it completes within the scene-phase callback rather than racing a task. Whether a `beginBackgroundTask` assertion is still warranted needs measuring on a real device under memory pressure.
 
 ## 14. PRD Traceability
 

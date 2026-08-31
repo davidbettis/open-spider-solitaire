@@ -122,5 +122,5 @@ struct HighScoresView: View {
 
 #Preview {
     NavigationStack { HighScoresView() }
-        .environment(HighScoresStore(storage: UserDefaultsHighScoresStorage()))
+        .environment(HighScoresStore())
 }

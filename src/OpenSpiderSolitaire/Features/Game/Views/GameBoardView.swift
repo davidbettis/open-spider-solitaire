@@ -20,6 +20,7 @@ struct GameBoardView: View {
     /// Recorded once per win, and cleared when a fresh game begins.
     @State private var winSummary: WinSummary?
 
+    let persistence: PersistenceService
     let onExit: () -> Void
 
     var body: some View {
@@ -28,16 +29,27 @@ struct GameBoardView: View {
             .background(feltBackground)
             .overlay { hintCancelCatcher }
             .overlay { winLayer }
-            .modifier(BoardDialogs(session: session,
-                                   confirmingNewGame: $confirmingNewGame,
-                                   confirmingRestart: $confirmingRestart))
+            .modifier(BoardDialogs(confirmingNewGame: $confirmingNewGame,
+                                   confirmingRestart: $confirmingRestart,
+                                   onNewGame: startNewGame,
+                                   onRestart: restartDeal))
             .onChange(of: scenePhase) { _, phase in
-                phase == .active ? session.resume() : session.pause()
+                if phase == .active {
+                    session.resume()
+                } else {
+                    // Pause first so `elapsed` is settled, then write straight
+                    // away rather than racing termination (spec §6.1).
+                    session.pause()
+                    if session.state.timerStarted && !session.isWon {
+                        persistence.saveGameSynchronously(session.snapshot)
+                    }
+                }
             }
             // A move / deal / undo makes the hint candidates stale (spec §4.2).
             .onChange(of: session.state.board) { _, _ in
                 hints.invalidate()
                 refreshCanFinish()
+                autosave()
             }
             .onAppear { refreshCanFinish() }
             // A game counts as started on its first forward move, which is
@@ -52,6 +64,8 @@ struct GameBoardView: View {
                 winSummary = highScores.recordWin(mode: session.state.mode,
                                                   score: session.displayScore,
                                                   time: session.elapsed)
+                // The game it described is over (spec §6.1).
+                Task { await persistence.deleteGame() }
             }
     }
 
@@ -83,6 +97,33 @@ struct GameBoardView: View {
         if session.isWon {
             WinOverlay(session: session, summary: winSummary, onExit: onExit)
         }
+    }
+
+    /// A new deal replaces the old game, so its snapshot goes with it
+    /// (spec §6.1). The fresh board has no moves yet, so nothing is written
+    /// back until the player actually plays.
+    private func startNewGame() {
+        Motion.instantly {
+            var rng = SystemRandomNumberGenerator()
+            session.newGame(mode: session.state.mode, rng: &rng)
+        }
+        Task { await persistence.deleteGame() }
+    }
+
+    /// Restart keeps the same deal, so the game stays resumable and autosave
+    /// simply overwrites the snapshot on the next move.
+    private func restartDeal() {
+        Motion.instantly { session.restart() }
+        Task { await persistence.deleteGame() }
+    }
+
+    /// Autosave the in-progress game, debounced inside the actor. A game with
+    /// no moves yet is not worth resuming, so it is not written at all — which
+    /// also keeps New Game's delete from being undone by a pending save.
+    private func autosave() {
+        guard session.state.timerStarted, !session.isWon else { return }
+        let snapshot = session.snapshot
+        Task { await persistence.scheduleGameSave(snapshot) }
     }
 
     /// Finish the board mechanically (spec §5.2). Starting an assist cancels a
@@ -151,28 +192,23 @@ struct GameBoardView: View {
 /// The board's two confirmations, lifted out of `GameBoardView.body` so the
 /// type-checker has a smaller expression to chew on.
 private struct BoardDialogs: ViewModifier {
-    let session: GameSession
     @Binding var confirmingNewGame: Bool
     @Binding var confirmingRestart: Bool
+    let onNewGame: () -> Void
+    let onRestart: () -> Void
 
     func body(content: Content) -> some View {
         content
             .confirmationDialog("Start a new game?", isPresented: $confirmingNewGame,
                                 titleVisibility: .visible) {
-                Button("New Game", role: .destructive) {
-                    // A whole new board arrives, rather than travelling there.
-                    Motion.instantly {
-                        var rng = SystemRandomNumberGenerator()
-                        session.newGame(mode: session.state.mode, rng: &rng)
-                    }
-                }
+                Button("New Game", role: .destructive, action: onNewGame)
                 Button("Cancel", role: .cancel) {}
             } message: {
                 Text("This ends the game in progress and deals a new one.")
             }
             .confirmationDialog("Restart this deal?", isPresented: $confirmingRestart,
                                 titleVisibility: .visible) {
-                Button("Restart", role: .destructive) { Motion.instantly { session.restart() } }
+                Button("Restart", role: .destructive, action: onRestart)
                 Button("Cancel", role: .cancel) {}
             } message: {
                 Text("The same cards are dealt again from the start.")

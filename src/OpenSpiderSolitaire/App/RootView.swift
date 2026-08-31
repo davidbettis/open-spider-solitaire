@@ -12,10 +12,23 @@ enum Route: Hashable {
 /// (spec: `GameBoardView` reads `@Environment(GameSession.self)`).
 struct RootView: View {
     @State private var game: GameSession?
-    @State private var highScores = HighScoresStore()
+    @State private var highScores: HighScoresStore
     @State private var path: [Route] = []
 
+    private let persistence: PersistenceService
+
     init() {
+        let persistence = PersistenceService()
+        self.persistence = persistence
+        _highScores = State(initialValue: HighScoresStore(
+            storage: PersistedHighScoresStorage(persistence: persistence)))
+
+        // Resume before the first frame, so the menu never flashes over a game
+        // that is still there (persistence spec §6.3).
+        if let resumed = persistence.loadGameNow() {
+            _game = State(initialValue: GameSession(resuming: resumed))
+        }
+
         #if DEBUG
         // Debug/QA hook: `AUTOSTART_MODE=1|2|4` launches straight into a game
         // (used for screenshots / future UI tests). No effect without the var.
@@ -30,7 +43,7 @@ struct RootView: View {
     var body: some View {
         Group {
             if let game {
-                GameBoardView(onExit: { self.game = nil })
+                GameBoardView(persistence: persistence, onExit: { self.game = nil })
                     .environment(game)
             } else {
                 NavigationStack(path: $path) {

@@ -127,7 +127,6 @@ struct HighScoresStoreTests {
         let encoded = try JSONEncoder().encode(data)
         let decoded = try JSONDecoder().decode(HighScoresData.self, from: encoded)
         #expect(decoded == data)
-        #expect(decoded.schemaVersion == HighScoresData.currentSchemaVersion)
 
         // Modes key the JSON objects, rather than degrading to a flat array.
         let json = try #require(String(data: encoded, encoding: .utf8))

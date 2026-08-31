@@ -2,40 +2,35 @@ import Foundation
 
 /// Where ``HighScoresStore`` keeps its data between launches.
 ///
-/// This is the seam [`persistence-and-migration`](../../../../docs/specs/persistence-and-migration.md)
-/// will take over: that spec owns the envelope, the migration chain, and atomic
-/// writes. Until it exists, the `UserDefaults` implementation below satisfies
-/// the durable-store role the persistence spec assigns to small, infrequently
-/// written payloads — and tests inject their own.
+/// Implemented by ``PersistedHighScoresStorage`` in the app and by an
+/// in-memory double in tests.
 protocol HighScoresStorage {
     /// Returns `nil` when there is nothing stored, or nothing readable.
     func load() -> HighScoresData?
     func save(_ data: HighScoresData)
 }
 
-/// `UserDefaults`-backed durable store — the persistence spec's recommendation
-/// for payloads this small.
-struct UserDefaultsHighScoresStorage: HighScoresStorage {
-    private static let key = "OpenSpiderSolitaire.highScores"
-
-    private let defaults: UserDefaults
-
-    init(defaults: UserDefaults = .standard) {
-        self.defaults = defaults
-    }
+/// Durable storage backed by the persistence layer's atomically-replaced JSON
+/// file (persistence spec §4, resolving its AI-1 in favour of a file).
+///
+/// This replaced a `UserDefaults` implementation deliberately: `set` there is
+/// asynchronous, so a win recorded moments before a hard kill could be lost.
+/// An atomic file write has landed by the time `save` returns.
+///
+/// Reads and writes are synchronous because durable saves happen only on a win
+/// or a reset — rare, and small enough to be sub-millisecond.
+struct PersistedHighScoresStorage: HighScoresStorage {
+    let persistence: PersistenceService
 
     func load() -> HighScoresData? {
-        guard let raw = defaults.data(forKey: Self.key),
-              let decoded = try? JSONDecoder().decode(HighScoresData.self, from: raw)
-        else { return nil }
-        // A payload from a newer build is unmigratable; fall back to defaults
-        // rather than misreading it (persistence spec §7).
-        guard decoded.schemaVersion <= HighScoresData.currentSchemaVersion else { return nil }
-        return decoded
+        persistence.loadDurableNow().highScores
     }
 
     func save(_ data: HighScoresData) {
-        guard let raw = try? JSONEncoder().encode(data) else { return }
-        defaults.set(raw, forKey: Self.key)
+        // Read-modify-write, so settings can join the payload later without
+        // this path clobbering them.
+        var durable = persistence.loadDurableNow()
+        durable.highScores = data
+        persistence.saveDurableNow(durable)
     }
 }

@@ -69,6 +69,15 @@ final class GameSession {
             && greedySolution(from: state.board) != nil
     }
 
+    /// The state as it stands right now, with `elapsed` brought up to date —
+    /// what persistence writes. `state.elapsed` only advances when the clock is
+    /// paused, so saving `state` directly would persist a stale timer.
+    var snapshot: GameState {
+        var copy = state
+        copy.elapsed = elapsed
+        return copy
+    }
+
     // MARK: Intents (illegal intents are silent no-ops)
 
     /// Single-tap auto-move: send the run at `(column, index)` to its best legal

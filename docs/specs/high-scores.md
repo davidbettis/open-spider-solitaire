@@ -1,6 +1,6 @@
 # Feature Spec: High Scores & Stats
 
-- **Status:** Draft
+- **Status:** Implemented. Durability currently rides on `UserDefaults`; [`persistence-and-migration`](./persistence-and-migration.md) will take over the store (see §10).
 - **Owner:** TBD
 - **Source PRD:** [`docs/PRD.md`](../PRD.md)
 - **Spec sequence:** #4. Depends on [`game-engine`](./game-engine.md) (final score/time) and [`persistence-and-migration`](./persistence-and-migration.md) (storage).
@@ -114,7 +114,7 @@ On a win, the engine/session provides `(mode, flooredScore, elapsed)`. This modu
 
 ## 10. Architecture & Concurrency
 
-- `@MainActor @Observable final class HighScoresStore` holds `HighScoresData`, exposes read models to views, and calls the persistence actor to save on mutation.
+- `@MainActor @Observable final class HighScoresStore` holds `HighScoresData`, exposes read models to views, and writes through to a `HighScoresStorage` on every mutation. That protocol is the seam the persistence spec will implement properly; today it is backed by `UserDefaults`, which that spec nominates for small, infrequently written payloads. Tests inject an in-memory double.
   ```swift
   @MainActor @Observable
   final class HighScoresStore {
@@ -130,16 +130,16 @@ On a win, the engine/session provides `(mode, flooredScore, elapsed)`. This modu
 
 ## 11. Acceptance Criteria
 
-- [ ] Leaderboards are tracked separately per mode; an entry in one mode never affects another.
-- [ ] Entries couple score+time from the same game; the displayed time is that game's time.
-- [ ] Ranking is score desc, then time asc, then date asc; verified with tie fixtures.
-- [ ] A leaderboard never exceeds `maxEntries`; the lowest-ranked entry is dropped on overflow.
-- [ ] Only floored (≥0) scores are stored.
-- [ ] `timeToBeat` returns the top entry's time (nil when empty).
-- [ ] `Placement` correctly reports `madeLeaderboard`, `rank`, `isNewBest`, and beat-previous-best flags across representative wins.
-- [ ] `gamesStarted` increments once per started game; `gamesWon` on each win; `winRate` computes correctly, and 0 started ⇒ 0 rate (no divide-by-zero).
-- [ ] `resetAll()` clears leaderboards and stats for all modes and persists; only fires after confirmation.
-- [ ] Data survives app restart (via durable store).
+- [x] Leaderboards are tracked separately per mode; an entry in one mode never affects another.
+- [x] Entries couple score+time from the same game; the displayed time is that game's time.
+- [x] Ranking is score desc, then time asc, then date asc; verified with tie fixtures.
+- [x] A leaderboard never exceeds `maxEntries`; the lowest-ranked entry is dropped on overflow.
+- [x] Only floored (≥0) scores are stored.
+- [x] `timeToBeat` returns the top entry's time (nil when empty).
+- [x] `Placement` correctly reports `madeLeaderboard`, `rank`, `isNewBest`, and beat-previous-best flags across representative wins.
+- [x] `gamesStarted` increments once per started game; `gamesWon` on each win; `winRate` computes correctly, and 0 started ⇒ 0 rate (no divide-by-zero).
+- [x] `resetAll()` clears leaderboards and stats for all modes and persists; only fires after confirmation.
+- [x] Data survives app restart — verified in the simulator by reading a leaderboard written by an earlier process. **Caveat:** `UserDefaults.set` is asynchronous, so a win recorded moments before a hard kill can be lost. The persistence spec's atomic write plus its save-on-`.background` trigger (§6.2/§6.4) is the fix; until then this is a known, narrow gap.
 
 ## 12. Testing Strategy
 
@@ -150,9 +150,10 @@ On a win, the engine/session provides `(mode, flooredScore, elapsed)`. This modu
 
 ## 13. Open Questions / Action Items
 
-- **AI-1:** Confirm N = 10 (PRD recommendation).
-- **AI-2:** Should `gamesStarted` count games abandoned before the first move? (Current rule: no — started = first move made.)
-- **AI-3:** Display formatting for time (MM:SS vs. H:MM:SS for long games) — coordinate with HUD.
+- ~~**AI-1:** Confirm N = 10~~ — **resolved**: `Leaderboard.maxEntries = 10`.
+- ~~**AI-2:** Should `gamesStarted` count games abandoned before the first move?~~ — **resolved**: no. It increments on the engine's `timerStarted` flip, so a game abandoned before its first move counts for nothing, and one abandoned after counts toward the denominator.
+- ~~**AI-3:** Display formatting for time~~ — **resolved**: both screens use the HUD's `TimeInterval.clockString`, which already widens to `H:MM:SS` past an hour.
+- **AI-4:** `HighScoresStorage` is a local seam with a `UserDefaults` implementation. [`persistence-and-migration`](./persistence-and-migration.md) should replace it with the durable store it specifies, and take ownership of versioning `HighScoresData.schemaVersion`.
 
 ## 14. PRD Traceability
 

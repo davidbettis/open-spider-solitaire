@@ -45,3 +45,23 @@ func makeState(mode: SuitMode = .four, board: Board) -> GameState {
 func emptyBoard() -> Board {
     Board(tableau: Array(repeating: [], count: 10), stock: [], completedRuns: [])
 }
+
+/// In-memory durable store for high-scores tests (spec §12).
+final class InMemoryHighScoresStorage: HighScoresStorage {
+    private(set) var stored: HighScoresData?
+    private(set) var saveCount = 0
+
+    init(_ initial: HighScoresData? = nil) { stored = initial }
+
+    func load() -> HighScoresData? { stored }
+    func save(_ data: HighScoresData) {
+        stored = data
+        saveCount += 1
+    }
+}
+
+/// A `ScoreEntry` with a date derived from `day`, so ordering tests are
+/// deterministic without depending on the wall clock.
+func makeEntry(score: Int, time: TimeInterval, day: Int = 0) -> ScoreEntry {
+    ScoreEntry(score: score, time: time, date: Date(timeIntervalSince1970: TimeInterval(day) * 86_400))
+}

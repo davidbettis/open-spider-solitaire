@@ -1,10 +1,15 @@
 import SwiftUI
 
-/// Main menu with suit-mode selection. Starting a game hands the chosen mode
-/// back to `RootView`, which creates the session. (High Scores wiring is the
-/// high-scores spec.)
+/// Main menu: suit-mode selection, High Scores, and Reset Scores (PRD Screens
+/// §1). Starting a game hands the chosen mode back to `RootView`, which creates
+/// the session.
 struct MenuView: View {
+    @Environment(HighScoresStore.self) private var highScores
+
     let onStart: (SuitMode) -> Void
+    let onHighScores: () -> Void
+
+    @State private var confirmingReset = false
 
     var body: some View {
         ZStack {
@@ -26,7 +31,7 @@ struct MenuView: View {
                         .foregroundStyle(.white.opacity(0.85))
                     ForEach(SuitMode.allCases, id: \.self) { mode in
                         Button { onStart(mode) } label: {
-                            Text(title(for: mode))
+                            Text(mode.menuTitle)
                                 .fontWeight(.semibold)
                                 .frame(maxWidth: 280)
                                 .padding(.vertical, 4)
@@ -37,20 +42,31 @@ struct MenuView: View {
                         .foregroundStyle(.black)
                     }
                 }
+
+                VStack(spacing: 10) {
+                    Button("High Scores", action: onHighScores)
+                        .buttonStyle(.bordered)
+                        .controlSize(.large)
+                        .tint(.white)
+                    Button("Reset Scores", role: .destructive) { confirmingReset = true }
+                        .buttonStyle(.borderless)
+                        .font(.subheadline)
+                        .tint(.white.opacity(0.75))
+                }
             }
             .padding()
         }
-    }
-
-    private func title(for mode: SuitMode) -> String {
-        switch mode {
-        case .one: return "1 Suit  ·  Easy"
-        case .two: return "2 Suits  ·  Medium"
-        case .four: return "4 Suits  ·  Hard"
+        .confirmationDialog("Reset all high scores?", isPresented: $confirmingReset,
+                            titleVisibility: .visible) {
+            Button("Reset Scores", role: .destructive) { highScores.resetAll() }
+            Button("Cancel", role: .cancel) {}
+        } message: {
+            Text("Every mode's leaderboard and stats are cleared. This cannot be undone.")
         }
     }
 }
 
 #Preview {
-    MenuView(onStart: { _ in })
+    MenuView(onStart: { _ in }, onHighScores: {})
+        .environment(HighScoresStore())
 }

@@ -12,6 +12,8 @@ enum Route: Hashable {
 /// (spec: `GameBoardView` reads `@Environment(GameSession.self)`).
 struct RootView: View {
     @State private var game: GameSession?
+    @State private var highScores = HighScoresStore()
+    @State private var path: [Route] = []
 
     init() {
         #if DEBUG
@@ -26,12 +28,24 @@ struct RootView: View {
     }
 
     var body: some View {
-        if let game {
-            GameBoardView(onExit: { self.game = nil })
-                .environment(game)
-        } else {
-            MenuView(onStart: startGame)
+        Group {
+            if let game {
+                GameBoardView(onExit: { self.game = nil })
+                    .environment(game)
+            } else {
+                NavigationStack(path: $path) {
+                    MenuView(onStart: startGame,
+                             onHighScores: { path.append(.highScores) })
+                        .navigationDestination(for: Route.self) { route in
+                            switch route {
+                            case .highScores: HighScoresView()
+                            case .game, .settings: EmptyView()
+                            }
+                        }
+                }
+            }
         }
+        .environment(highScores)
     }
 
     private func startGame(_ mode: SuitMode) {

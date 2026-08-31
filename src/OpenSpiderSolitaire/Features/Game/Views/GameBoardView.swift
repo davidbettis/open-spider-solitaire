@@ -5,6 +5,7 @@ import SwiftUI
 /// ephemeral UI state — the drag/frames coordinator and the new-game dialog.
 struct GameBoardView: View {
     @Environment(GameSession.self) private var session
+    @Environment(HighScoresStore.self) private var highScores
     @Environment(\.scenePhase) private var scenePhase
 
     /// Matches each card by `Card.id` as it moves between columns (spec §5.1).
@@ -16,10 +17,45 @@ struct GameBoardView: View {
     /// Cached because `session.canAutoComplete` runs a full greedy solve; it is
     /// refreshed on board changes rather than on every view update.
     @State private var canFinish = false
+    /// Recorded once per win, and cleared when a fresh game begins.
+    @State private var winSummary: WinSummary?
 
     let onExit: () -> Void
 
     var body: some View {
+        boardStack
+            .environment(interaction)
+            .background(feltBackground)
+            .overlay { hintCancelCatcher }
+            .overlay { winLayer }
+            .modifier(BoardDialogs(session: session,
+                                   confirmingNewGame: $confirmingNewGame,
+                                   confirmingRestart: $confirmingRestart))
+            .onChange(of: scenePhase) { _, phase in
+                phase == .active ? session.resume() : session.pause()
+            }
+            // A move / deal / undo makes the hint candidates stale (spec §4.2).
+            .onChange(of: session.state.board) { _, _ in
+                hints.invalidate()
+                refreshCanFinish()
+            }
+            .onAppear { refreshCanFinish() }
+            // A game counts as started on its first forward move, which is
+            // exactly when the engine starts the clock (high-scores §6).
+            .onChange(of: session.state.timerStarted) { _, started in
+                if started { highScores.recordGameStarted(mode: session.state.mode) }
+            }
+            // Recording on the transition gives one record per win, and clears
+            // the summary when a new game resets `isWon`.
+            .onChange(of: session.isWon) { _, won in
+                guard won else { winSummary = nil; return }
+                winSummary = highScores.recordWin(mode: session.state.mode,
+                                                  score: session.displayScore,
+                                                  time: session.elapsed)
+            }
+    }
+
+    private var boardStack: some View {
         VStack(spacing: 0) {
             HUDBar(session: session, onExit: onExit, onDeal: deal)
             tableauArea
@@ -28,48 +64,25 @@ struct GameBoardView: View {
                        confirmingRestart: $confirmingRestart,
                        onHint: { hints.start(board: session.state.board) })
         }
-        .environment(interaction)
-        .background(feltBackground)
-        // Any tap anywhere cancels the cycle (spec §4.2), so this sits above
-        // the board and the bars and swallows the gesture that cancels it.
-        .overlay {
-            if hints.isCycling {
-                Color.clear
-                    .contentShape(Rectangle())
-                    .onTapGesture { hints.cancel() }
-                    .ignoresSafeArea()
-            }
+    }
+
+    /// Any tap anywhere cancels the hint cycle (spec §4.2), so this sits above
+    /// the board and the bars and swallows the gesture that cancels it.
+    @ViewBuilder
+    private var hintCancelCatcher: some View {
+        if hints.isCycling {
+            Color.clear
+                .contentShape(Rectangle())
+                .onTapGesture { hints.cancel() }
+                .ignoresSafeArea()
         }
-        .overlay {
-            if session.isWon { WinOverlay(session: session, onExit: onExit) }
+    }
+
+    @ViewBuilder
+    private var winLayer: some View {
+        if session.isWon {
+            WinOverlay(session: session, summary: winSummary, onExit: onExit)
         }
-        .confirmationDialog("Start a new game?", isPresented: $confirmingNewGame, titleVisibility: .visible) {
-            Button("New Game", role: .destructive) {
-                // A whole new board arrives, rather than travelling there.
-                Motion.instantly {
-                    var rng = SystemRandomNumberGenerator()
-                    session.newGame(mode: session.state.mode, rng: &rng)
-                }
-            }
-            Button("Cancel", role: .cancel) {}
-        } message: {
-            Text("This ends the game in progress and deals a new one.")
-        }
-        .confirmationDialog("Restart this deal?", isPresented: $confirmingRestart, titleVisibility: .visible) {
-            Button("Restart", role: .destructive) { Motion.instantly { session.restart() } }
-            Button("Cancel", role: .cancel) {}
-        } message: {
-            Text("The same cards are dealt again from the start.")
-        }
-        .onChange(of: scenePhase) { _, phase in
-            phase == .active ? session.resume() : session.pause()
-        }
-        // A move / deal / undo makes the candidates stale (spec §4.2).
-        .onChange(of: session.state.board) { _, _ in
-            hints.invalidate()
-            refreshCanFinish()
-        }
-        .onAppear { refreshCanFinish() }
     }
 
     /// Finish the board mechanically (spec §5.2). Starting an assist cancels a
@@ -132,5 +145,37 @@ struct GameBoardView: View {
                                 Color(red: 0.03, green: 0.24, blue: 0.12)],
                        startPoint: .top, endPoint: .bottom)
             .ignoresSafeArea()
+    }
+}
+
+/// The board's two confirmations, lifted out of `GameBoardView.body` so the
+/// type-checker has a smaller expression to chew on.
+private struct BoardDialogs: ViewModifier {
+    let session: GameSession
+    @Binding var confirmingNewGame: Bool
+    @Binding var confirmingRestart: Bool
+
+    func body(content: Content) -> some View {
+        content
+            .confirmationDialog("Start a new game?", isPresented: $confirmingNewGame,
+                                titleVisibility: .visible) {
+                Button("New Game", role: .destructive) {
+                    // A whole new board arrives, rather than travelling there.
+                    Motion.instantly {
+                        var rng = SystemRandomNumberGenerator()
+                        session.newGame(mode: session.state.mode, rng: &rng)
+                    }
+                }
+                Button("Cancel", role: .cancel) {}
+            } message: {
+                Text("This ends the game in progress and deals a new one.")
+            }
+            .confirmationDialog("Restart this deal?", isPresented: $confirmingRestart,
+                                titleVisibility: .visible) {
+                Button("Restart", role: .destructive) { Motion.instantly { session.restart() } }
+                Button("Cancel", role: .cancel) {}
+            } message: {
+                Text("The same cards are dealt again from the start.")
+            }
     }
 }

@@ -8,6 +8,9 @@ struct ColumnView: View {
     let cards: [Card]
     let layout: BoardLayout
     let regionHeight: CGFloat
+    /// Shared with every other column so a card gliding between them is matched
+    /// by its stable `Card.id` (spec §5.1).
+    let cardNamespace: Namespace.ID
 
     @Environment(GameSession.self) private var session
     @Environment(BoardInteraction.self) private var interaction
@@ -57,6 +60,7 @@ struct ColumnView: View {
     private func cardView(_ card: Card, at position: Int) -> some View {
         let isDragging = interaction.drag.map { $0.sourceColumn == index && position >= $0.sourceIndex } ?? false
         return CardView(card: card, size: layout.cardSize)
+            .matchedGeometryEffect(id: card.id, in: cardNamespace)
             .offset(y: layout.cardY(index: position, in: cards))
             .zIndex(Double(position))
             .opacity(isDragging ? 0 : 1)
@@ -82,9 +86,10 @@ struct ColumnView: View {
             .onEnded { value in
                 if interaction.drag != nil {
                     interaction.updateDrag(to: value.location)
-                    interaction.endDrag(session: session)
+                    withAnimation(Motion.glide) { interaction.endDrag(session: session) }
                 } else {
-                    _ = session.tap(column: index, index: position)   // treated as a tap
+                    // Treated as a tap: the run glides to its auto-destination.
+                    withAnimation(Motion.glide) { _ = session.tap(column: index, index: position) }
                 }
             }
     }

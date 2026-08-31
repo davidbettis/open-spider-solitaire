@@ -57,3 +57,77 @@ struct CardOutline: View {
             .frame(width: size.width, height: size.height)
     }
 }
+
+/// The face-up side of a card. Split out of ``CardView`` so ``FlippingCard``
+/// can show it independently of the back.
+struct CardFace: View {
+    let card: Card
+    let size: CGSize
+
+    var body: some View {
+        RoundedRectangle(cornerRadius: cornerRadius)
+            .fill(.white)
+            .overlay(RoundedRectangle(cornerRadius: cornerRadius).strokeBorder(.black.opacity(0.25), lineWidth: 0.5))
+            .overlay(alignment: .topLeading) { corner.padding(size.width * 0.08) }
+            .overlay {
+                Image(systemName: card.suit.symbolName)
+                    .font(.system(size: size.width * 0.42))
+                    .foregroundStyle(card.suit.tint)
+            }
+            .frame(width: size.width, height: size.height)
+    }
+
+    private var cornerRadius: CGFloat { size.width * 0.12 }
+
+    private var corner: some View {
+        VStack(spacing: -size.width * 0.02) {
+            Text(rankText)
+                .font(.system(size: size.width * 0.34, weight: .bold, design: .rounded))
+            Image(systemName: card.suit.symbolName)
+                .font(.system(size: size.width * 0.20))
+        }
+        .foregroundStyle(card.suit.tint)
+        .lineLimit(1)
+        .minimumScaleFactor(0.5)
+    }
+
+    private var rankText: String {
+        switch card.rank {
+        case .ace: return "A"
+        case .jack: return "J"
+        case .queen: return "Q"
+        case .king: return "K"
+        case .ten: return "10"
+        default: return String(card.rank.rawValue)
+        }
+    }
+}
+
+/// A card mid-turn (spec §5). `Animatable` so the view can read the
+/// *interpolated* angle and swap back for face at the halfway point — that
+/// swap is what reads as a flip rather than a cross-fade.
+struct FlippingCard: View, Animatable {
+    /// 0° = fully face-up, 180° = fully face-down.
+    var angle: Double
+    let card: Card
+    let size: CGSize
+
+    // SwiftUI interpolates this off the main actor; reading a stored property
+    // of a value type there is safe, so the conformance is nonisolated.
+    nonisolated var animatableData: Double {
+        get { angle }
+        set { angle = newValue }
+    }
+
+    var body: some View {
+        Group {
+            if angle < 90 {
+                CardFace(card: card, size: size)
+            } else {
+                // Counter-rotate so the back is not seen mirrored.
+                CardBack(size: size).rotation3DEffect(.degrees(180), axis: (x: 0, y: 1, z: 0))
+            }
+        }
+        .rotation3DEffect(.degrees(angle), axis: (x: 0, y: 1, z: 0), perspective: 0.35)
+    }
+}

@@ -20,7 +20,8 @@ struct ControlBar: View {
             Spacer()
             // The system's disabled dimming all but vanishes on the dark felt,
             // so the unavailable state is drawn explicitly.
-            Button("Undo") { session.undo() }
+            // Undo jumps back; it never plays a move in reverse (spec §7).
+            Button("Undo") { Motion.instantly { session.undo() } }
                 .foregroundStyle(.white.opacity(session.canUndo ? 1 : 0.35))
                 .disabled(!session.canUndo)
             Spacer()

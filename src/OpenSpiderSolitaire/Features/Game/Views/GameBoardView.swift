@@ -7,6 +7,8 @@ struct GameBoardView: View {
     @Environment(GameSession.self) private var session
     @Environment(\.scenePhase) private var scenePhase
 
+    /// Matches each card by `Card.id` as it moves between columns (spec §5.1).
+    @Namespace private var cardNamespace
     @State private var interaction = BoardInteraction()
     @State private var hints = HintController()
     @State private var confirmingNewGame = false
@@ -43,15 +45,18 @@ struct GameBoardView: View {
         }
         .confirmationDialog("Start a new game?", isPresented: $confirmingNewGame, titleVisibility: .visible) {
             Button("New Game", role: .destructive) {
-                var rng = SystemRandomNumberGenerator()
-                session.newGame(mode: session.state.mode, rng: &rng)
+                // A whole new board arrives, rather than travelling there.
+                Motion.instantly {
+                    var rng = SystemRandomNumberGenerator()
+                    session.newGame(mode: session.state.mode, rng: &rng)
+                }
             }
             Button("Cancel", role: .cancel) {}
         } message: {
             Text("This ends the game in progress and deals a new one.")
         }
         .confirmationDialog("Restart this deal?", isPresented: $confirmingRestart, titleVisibility: .visible) {
-            Button("Restart", role: .destructive) { session.restart() }
+            Button("Restart", role: .destructive) { Motion.instantly { session.restart() } }
             Button("Cancel", role: .cancel) {}
         } message: {
             Text("The same cards are dealt again from the start.")
@@ -71,7 +76,7 @@ struct GameBoardView: View {
     /// running hint (spec §6).
     private func finish() {
         hints.cancel()
-        session.autoComplete()
+        withAnimation(Motion.glide) { session.autoComplete() }
     }
 
     /// `canAutoComplete` is short-circuited early in the game, but once the
@@ -87,7 +92,9 @@ struct GameBoardView: View {
     /// so flash the offending columns rather than leaving a live control that
     /// silently does nothing (spec §6.3).
     private func deal() {
-        guard !session.deal() else { return }
+        var dealt = false
+        withAnimation(Motion.glide) { dealt = session.deal() }
+        guard !dealt else { return }
         interaction.flashEmptyColumns(board: session.state.board)
     }
 
@@ -97,7 +104,8 @@ struct GameBoardView: View {
             ZStack(alignment: .top) {
                 TableauView(tableau: session.state.board.tableau,
                             layout: layout,
-                            regionHeight: proxy.size.height)
+                            regionHeight: proxy.size.height,
+                            cardNamespace: cardNamespace)
                 if let candidate = hints.current {
                     HintLayer(candidate: candidate,
                               board: session.state.board,

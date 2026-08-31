@@ -1,6 +1,6 @@
 # Feature Spec: Animations & Feedback
 
-- **Status:** Draft
+- **Status:** Core motion layer implemented — glide, flip, instant undo, and the absences. Animated deal, run-clear, and win cascade are outstanding (see §12).
 - **Owner:** TBD
 - **Source PRD:** [`docs/PRD.md`](../PRD.md)
 - **Spec sequence:** #6. Depends on [`game-engine`](./game-engine.md) (state transitions) and [`game-board-ui`](./game-board-ui.md) (card views, layout, `matchedGeometryEffect` namespace). Sequenced by [`hints-and-autocomplete`](./hints-and-autocomplete.md) for previews/finishes.
@@ -50,8 +50,11 @@ enum Motion {
     static let flip      = Animation.easeInOut(duration: 0.22)
     static let clear     = Animation.easeInOut(duration: 0.45)
     static let cascade   = Animation.easeIn(duration: 0.35)    // per card in win cascade
-    static let instant   = Animation?.none                     // undo: no animation
     static let dealStagger: TimeInterval = 0.04                // between successive dealt cards
+
+    /// Undo and whole-board replacements: applies `body` inside a Transaction
+    /// with `disablesAnimations`, so matched geometry snaps (§7).
+    static func instantly(_ body: () -> Void)
 }
 ```
 
@@ -74,8 +77,14 @@ State transitions come from the engine (via the `@Observable` session); the UI d
 | Hint preview | Ghost-card **glide** to a destination and back (no state change) — sequenced by [`hints-and-autocomplete`](./hints-and-autocomplete.md). |
 
 ### 5.1 Driving matched-geometry moves
-- The board owns `@Namespace var cardNS`; each `CardView` applies `.matchedGeometryEffect(id: card.id, in: cardNS)`.
-- When the engine board changes inside `withAnimation(Motion.glide)`, SwiftUI interpolates each card from its old frame to its new one automatically. Because `Card.id` is stable across moves (engine §4), even duplicate ranks animate to the correct target.
+
+**Implemented.** `GameBoardView` owns `@Namespace private var cardNamespace`, threaded through `TableauView` to `ColumnView`, which applies `.matchedGeometryEffect(id: card.id, in:)` to each card. The modifier lives on `ColumnView`'s card, not inside `CardView`, because `DragLayer` and `HintLayer` render `CardView`s that must *not* join the namespace — two sources for one id would fight.
+
+Every board mutation now picks its motion explicitly, with no default: tap, drag-drop, deal, and auto-complete run inside `withAnimation(Motion.glide)`; undo, Restart, and New Game run inside `Motion.instantly`.
+
+The flip angle is derived from `card.isFaceUp` rather than held in view state, so the ambient transaction decides whether it animates — which is what keeps undo's re-hiding of a card instant too. `FlippingCard` is `Animatable` (with a `nonisolated animatableData`, required under Swift 6 strict concurrency) so it can read the *interpolated* angle and swap back for face at 90°; that swap is what reads as a turn rather than a cross-fade.
+
+When the engine board changes inside `withAnimation(Motion.glide)`, SwiftUI interpolates each card from its old frame to its new one automatically. Because `Card.id` is stable across moves (engine §4), even duplicate ranks animate to the correct target.
 
 ## 6. Win Cascade & Summary
 
@@ -91,7 +100,7 @@ State transitions come from the engine (via the `@Observable` session); the UI d
 
 - **No haptics.** No `UIFeedbackGenerator` calls anywhere.
 - **No sound.** No audio assets or `AVAudioPlayer`.
-- **No invalid-move feedback.** A rejected move (snap-back from drag, inert tap) plays no shake/flash/haptic — the card simply returns or nothing happens.
+- **No invalid-move feedback.** A rejected *move* (snap-back from drag, inert tap) plays no shake/flash/haptic — the card simply returns or nothing happens. One deliberate exception, added after playtesting: a **deal** refused because a column is empty flashes that column red, since a live control that silently does nothing reads as broken ([`game-board-ui`](./game-board-ui.md) §6.3).
 - **Reduce Motion:** not handled at launch (PRD). Noted as low-effort and worth reconsidering — see AI-2. If added, it would swap animated events for `Motion.instant` and replace the cascade with a static win state.
 
 ## 9. Architecture & Concurrency
@@ -102,13 +111,13 @@ State transitions come from the engine (via the `@Observable` session); the UI d
 
 ## 10. Acceptance Criteria
 
-- [ ] Moving a card/run glides via matched geometry to the correct destination frame; duplicate-rank cards animate to their own targets (stable `id`).
+- [x] Moving a card/run glides via matched geometry to the correct destination frame; duplicate-rank cards animate to their own targets (stable `id`).
 - [ ] Initial deal and each stock deal animate with a visible stagger; dealt tops end face-up.
-- [ ] Revealing a face-down card plays a flip.
+- [x] Revealing a face-down card plays a flip.
 - [ ] Clearing a K→A run plays the clear celebration and the cards are then gone.
 - [ ] Winning plays the cascade and presents the summary; the player can dismiss without waiting for the cascade to end.
-- [ ] **Undo applies instantly with no animation** (verified: no interpolation frames on the restored diff).
-- [ ] No haptic, sound, or invalid-move feedback occurs on any path (including rejected drags and inert taps).
+- [x] **Undo applies instantly with no animation** — `Motion.instantly` applies the restored board inside a `Transaction` with `disablesAnimations`, so matched geometry snaps. Verified by construction; not yet confirmed frame-by-frame on device.
+- [x] No haptic or sound on any path (grep-verified: no `UIFeedbackGenerator`, `AudioServices`, or AVFoundation reference in the source). Invalid *moves* stay silent; the one deliberate exception is the empty-column flash on a refused deal — see [`game-board-ui`](./game-board-ui.md) §6.3.
 - [ ] Auto-complete replays with glide+clear then win; hint previews animate without mutating state.
 
 ## 11. Testing Strategy
@@ -122,7 +131,9 @@ State transitions come from the engine (via the `@Observable` session); the UI d
 - **AI-1:** Tune all `Motion` durations/curves on device; confirm deal stagger feels good for 54 cards without dragging.
 - **AI-2:** Reconsider Reduce Motion support (PRD flags it as low-effort) — map events → instant and cascade → static.
 - **AI-3:** Whether a tap can fast-forward/skip the initial deal and win cascade.
-- **AI-4:** Cascade implementation choice (`TimelineView` + physics vs. keyframe animation) — pick after a spike.
+- **AI-4:** Cascade implementation choice (`TimelineView` + physics vs. keyframe animation) — pick after a spike. Still open, and the win summary it hands off to needs `WinSummary` from [`high-scores`](./high-scores.md), which is not built.
+- **AI-5:** The animated deal (§5, initial + stock) needs the dealt cards to have a *source* frame at the HUD deck before they exist in a column — most likely `DeckIndicator` rendering the top of the stock into the same namespace. Not attempted yet.
+- **AI-6:** Run-clear celebration (§5) needs the old→new board diff described in §11 to identify the 13 departing cards; that diff is deliberately not built yet, since nothing else currently consumes it.
 
 ## 13. PRD Traceability
 

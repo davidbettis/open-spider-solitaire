@@ -23,12 +23,35 @@ struct ColumnView: View {
             }
         }
         .frame(width: layout.cardSize.width, height: regionHeight, alignment: .top)
+        .overlay(alignment: .top) { blockedFlash }
         .background(
             GeometryReader { proxy in
                 Color.clear.preference(key: ColumnFramesKey.self,
                                        value: [index: proxy.frame(in: .named("board"))])
             }
         )
+    }
+
+    /// Flashes red when this empty column is what refused a deal (spec §6.3).
+    /// Sized to one card so it reads as "a card belongs here", not "this whole
+    /// strip is wrong".
+    @ViewBuilder
+    private var blockedFlash: some View {
+        let isBlocked = interaction.blockedColumns.contains(index)
+        RoundedRectangle(cornerRadius: layout.cardSize.width * 0.12)
+            // Enough opacity to read as red over the dark felt — a lighter
+            // wash blends to olive against the green.
+            .fill(.red.opacity(0.55))
+            .overlay(
+                RoundedRectangle(cornerRadius: layout.cardSize.width * 0.12)
+                    .strokeBorder(.red, lineWidth: max(2, layout.cardSize.width * 0.05))
+            )
+            .frame(width: layout.cardSize.width, height: layout.cardSize.height)
+            .offset(y: layout.topInset)
+            .opacity(isBlocked ? 1 : 0)
+            .animation(.easeInOut(duration: 0.15).repeatCount(5, autoreverses: true),
+                       value: isBlocked)
+            .allowsHitTesting(false)
     }
 
     private func cardView(_ card: Card, at position: Int) -> some View {

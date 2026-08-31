@@ -43,16 +43,19 @@ The Game Board UI renders the live game — the 10-column tableau, the stock, th
 
 ```
 GameBoardView
-├─ HUDBar                     // top: score · timer · deals-remaining
+├─ HUDBar                     // top: set slots · score/timer · deck (deal)
+│   ├─ SetSlots               // left: 8 completed-set slots
+│   └─ DeckIndicator          // right: face-down deck, taps to deal
 ├─ TableauView                // 10 ColumnViews in an HStack, GeometryReader-sized
 │   └─ ColumnView × 10
 │       └─ CardView × n       // fanned; face-down tighter, face-up looser
 ├─ DragLayer (overlay)        // renders the run currently being dragged
-└─ ControlBar                 // bottom: New Game · Undo · Hint
+└─ ControlBar                 // bottom: New Game · Undo · Hint (text titles)
 ```
 
 - `GameBoardView` reads `@Environment(GameSession.self)` (engine) and owns `@State private var drag: DragState?` plus `@State private var confirmingNewGame = false`.
-- The stock is presented in the HUD/ControlBar as a tappable **deals-remaining** indicator (tap = deal). The initial face-down deck footprint is optional decoration.
+- The stock is presented in the HUD's right zone as a **face-down deck** whose stack depth is the number of deals still available; it is itself the deal control (tap = deal). The ControlBar carries no deal button.
+- HUD zone sizing is a pure value (`HUDLayout`), computed from the container width so the eight slots and the deck always fit beside the centred stats.
 
 ## 5. Responsive Layout Model
 
@@ -92,16 +95,18 @@ Only face-up cards that head a valid movable run are interactive; tapping/draggi
 4. **Commit or snap back:** call `session.move(from:index:to:)`. If it returns `true`, the engine state changed and [`animations`](./animations.md) glides cards to their new home; if `false` (illegal target or no target hit), the run snaps back to its origin with no state change and no error.
 
 ### 6.3 Controls
-- **Deal:** tap the deals-remaining indicator → `session.deal()`. Disabled/no-op when `!session.canDeal` (empty column present or stock exhausted); disabled state is shown but never errors.
+- **Deal:** tap the HUD deck (`DeckIndicator`) → `session.deal()`. The deck is greyed **only when the stock is spent** (`dealsRemaining == 0`); while cards remain it stays live even though the engine refuses to deal onto an empty column. A refused deal **flashes every empty column red** (~0.9s, `BoardInteraction.blockedColumns`) so the block is explained rather than presented as a dead control.
 - **Undo:** `session.undo()`; disabled at game start.
-- **Hint:** hands off to [`hints-and-autocomplete`](./hints-and-autocomplete.md).
+- **Hint:** text button; starts the hint cycle owned by [`hints-and-autocomplete`](./hints-and-autocomplete.md). While cycling, any tap anywhere cancels.
 - **New Game:** if a game is in progress (any move made and not won), present a confirmation dialog before `session.newGame(...)`; otherwise start immediately.
 
 ## 7. HUD
 
 - **Score:** `session.displayScore` (already floored at 0). Updates reactively via `@Observable`.
 - **Timer:** MM:SS from `session.state.elapsed`, ticking once per second **only while running**. Driven by a UI-side `TimelineView(.periodic)` or a 1 Hz timer that reads engine elapsed; the engine remains the source of truth for accumulated time (§11 engine spec). Pauses with the engine.
-- **Deals remaining:** `session.state.board.dealsRemaining` (0–5).
+- **Completed sets (left):** one card-shaped slot per King→Ace run, eight total, filled left-to-right from `board.completedRuns` in completion order; a filled slot shows that run's suit pip, an empty one a dashed outline. Replaces the former `Sets` text stat.
+- **Deck (right):** `board.dealsRemaining` (0–5) rendered as that many stacked card backs plus a numeric badge, over a persistent empty footprint so the bar does not reflow as the stock drains. Dimmed and inert only when the stock is spent — see §6.3 for the empty-column case.
+- **Menu:** icon-only chevron at the far left, ahead of the slots.
 
 ## 8. Lifecycle & Pause
 
@@ -129,18 +134,18 @@ Only face-up cards that head a valid movable run are interactive; tapping/draggi
 - [ ] Tap under threshold routes to `session.tap`; movement at/over threshold initiates a drag.
 - [ ] Dragging a valid run and dropping on a legal column calls `session.move` and the move commits; dropping on an illegal/empty target snaps back with no state change and no error.
 - [ ] Face-down and non-run cards are inert.
-- [ ] Deal indicator triggers `session.deal()` and is inert when `!canDeal`.
+- [x] Deal indicator triggers `session.deal()`; it is greyed only when the stock is spent, and a deal refused by an empty column flashes that column red.
 - [ ] Undo is disabled at game start and enabled after any move.
 - [ ] New Game mid-play shows a confirmation; on a fresh/won board it starts immediately.
 - [ ] Score shows floored value; timer shows MM:SS and ticks only while running.
 - [ ] Backgrounding or opening a menu pauses the timer; returning resumes it.
-- [ ] No invalid-move feedback anywhere.
+- [x] No invalid-move feedback anywhere, with one deliberate exception: a deal blocked by an empty column flashes that column (§6.3). Rejected *moves* stay silent.
 
 ## 12. Open Questions / Action Items
 
 - **AI-1:** Pin card aspect ratio and min/max card width once the CC0 deck is chosen (PRD action item).
 - **AI-2:** Confirm drag `minimumDistance` threshold and touch-offset feel on device.
-- **AI-3:** Decide stock visual: minimal deals-remaining chip vs. a face-down deck graphic.
+- ~~**AI-3:** Decide stock visual~~ — **resolved**: face-down deck graphic in the HUD's right zone, stack depth = deals remaining, tap to deal.
 
 ## 13. PRD Traceability
 

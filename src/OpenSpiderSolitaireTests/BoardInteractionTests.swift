@@ -56,4 +56,57 @@ import Testing
         interaction.endDrag(session: s)
         #expect(s.state.moveCount == 0)
     }
+
+    // MARK: Blocked-deal flash (spec §6.3)
+
+    /// 9 columns holding a card, column 3 empty, one deal still in stock.
+    private func boardWithEmptyColumns(_ empties: Set<Int>) -> Board {
+        var board = emptyBoard()
+        for i in 0..<10 where !empties.contains(i) {
+            board.tableau[i] = [makeCard(i, .seven, .spades)]
+        }
+        board.stock = makeRun(.spades, from: 13, to: 4, startID: 100)   // 10 cards
+        return board
+    }
+
+    @Test func flashMarksEveryEmptyColumn() {
+        let interaction = BoardInteraction()
+        interaction.flashEmptyColumns(board: boardWithEmptyColumns([3, 7]))
+        #expect(interaction.blockedColumns == [3, 7])
+    }
+
+    @Test func flashIsANoOpWhenNoColumnIsEmpty() {
+        let interaction = BoardInteraction()
+        interaction.flashEmptyColumns(board: boardWithEmptyColumns([]))
+        #expect(interaction.blockedColumns.isEmpty)
+    }
+
+    @Test func clearingTheFlashRemovesTheMarks() {
+        let interaction = BoardInteraction()
+        interaction.flashEmptyColumns(board: boardWithEmptyColumns([3]))
+        interaction.clearFlash()
+        #expect(interaction.blockedColumns.isEmpty)
+    }
+
+    /// The deck stays live while cards remain, so a refused deal is what
+    /// triggers the flash — the control is never silently dead.
+    @Test func refusedDealIsWhatFlashes() {
+        let board = boardWithEmptyColumns([3])
+        let s = GameSession(resuming: makeState(board: board), clock: FakeClock())
+        #expect(s.state.board.dealsRemaining == 1)   // deck shows "1", not greyed
+        #expect(!s.canDeal)                          // but the engine refuses
+
+        let interaction = BoardInteraction()
+        if !s.deal() { interaction.flashEmptyColumns(board: s.state.board) }
+        #expect(interaction.blockedColumns == [3])
+    }
+
+    @Test func successfulDealDoesNotFlash() {
+        let board = boardWithEmptyColumns([])
+        let s = GameSession(resuming: makeState(board: board), clock: FakeClock())
+        let interaction = BoardInteraction()
+        if !s.deal() { interaction.flashEmptyColumns(board: s.state.board) }
+        #expect(interaction.blockedColumns.isEmpty)
+        #expect(s.state.board.dealsRemaining == 0)
+    }
 }

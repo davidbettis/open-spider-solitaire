@@ -1,6 +1,6 @@
 # Feature Spec: Hints & Auto-Complete
 
-- **Status:** Draft
+- **Status:** Hints implemented; Auto-Complete (§5) still unwired in the UI
 - **Owner:** TBD
 - **Source PRD:** [`docs/PRD.md`](../PRD.md)
 - **Spec sequence:** #5. Depends on [`game-engine`](./game-engine.md) (legal-move enumeration, auto-complete logic) and [`game-board-ui`](./game-board-ui.md) / [`animations`](./animations.md) (presentation).
@@ -57,7 +57,8 @@ struct HintProvider {
 ```
 
 - For each column, take its top movable run (and legal sub-runs), and for each, enumerate legal destinations (engine `Rules.canPlace`).
-- **Ordering** mirrors the auto-move priority so the "best" hints show first: same-suit continuation → any legal descending placement → empty column; ties by leftmost source then leftmost destination.
+- **Ordering is a plain scan, deliberately not strategic**: source column left to right, shortest run first within a column, then destination left to right. Hints report the moves that *exist*; ranking them by quality would make the assist play the game for the player. (This supersedes an earlier draft that ordered by the auto-move priority.)
+- Every legal move is cycled — there is no top-K cap (resolves AI-3).
 - De-duplicate trivially equivalent suggestions (same run to the same destination).
 - If there are **no** candidates, the Hint control is a no-op (optionally briefly disabled); no feedback beyond that (consistent with "no invalid-move feedback").
 
@@ -71,7 +72,7 @@ cycling(_) ──any board tap / gesture / control──▶ idle       // cancel
 idle ──game state changes (move/deal/undo)──▶ idle           // candidates invalidated
 ```
 
-- On entering `cycling(i)`, animate a **ghost/preview** of candidate `i`'s card from source toward `destinationColumn` and back (or highlight), using [`animations`](./animations.md) primitives. The real cards do not move.
+- On entering `cycling(i)`, a translucent **ghost** of the suggested run glides from where it sits to the slot it would land in, and the destination gets a ring (`HintLayer`). The real cards do not move. Positions come from `BoardLayout`, so this needs nothing from [`animations`](./animations.md) (resolves AI-1).
 - **Cancel:** any tap anywhere (board, HUD, control) returns to `idle` and clears the preview immediately.
 - **Invalidation:** any actual state mutation exits the cycle (candidates may be stale).
 - The **timer keeps running** during hints (PRD: hints cost time, not points). No counters change.
@@ -100,26 +101,26 @@ Bind to engine `session.canAutoComplete` (§10 engine spec: stock empty, all car
 
 ## 8. Acceptance Criteria
 
-- [ ] Hint enumerates all legal candidate moves for the current board, ordered by the auto-move priority, de-duplicated.
-- [ ] The hint cycle advances through candidates and loops; it animates previews without changing the board or any counter.
-- [ ] Any tap cancels the cycle immediately and clears the preview.
-- [ ] A board mutation (move/deal/undo) exits the hint cycle.
-- [ ] With no legal moves, Hint is an inert no-op.
-- [ ] Hints cost 0 points and never touch `moveCount`/`undoCount`/score; the timer keeps running during a hint.
+- [x] Hint enumerates all legal candidate moves for the current board, in scan order, de-duplicated.
+- [x] The hint cycle advances through candidates and loops; it animates previews without changing the board or any counter.
+- [x] Any tap cancels the cycle immediately and clears the preview.
+- [x] A board mutation (move/deal/undo) exits the hint cycle.
+- [x] With no legal moves, Hint is an inert no-op.
+- [x] Hints cost 0 points and never touch `moveCount`/`undoCount`/score; the timer keeps running during a hint.
 - [ ] The auto-complete affordance appears exactly when `session.canAutoComplete` is true.
 - [ ] `autoComplete()` finishes to a win with 0 point cost.
 
 ## 9. Testing Strategy
 
-- `HintProvider` unit tests: candidate completeness, ordering matches auto-move priority, de-dup, empty-board-of-moves case (pure, no UI).
+- `HintProvider` unit tests: candidate completeness, sub-run enumeration, scan ordering, de-dup, empty-board-of-moves case (pure, no UI).
 - `HintController` state-machine tests: cycle advance/loop, cancel-on-tap, invalidate-on-mutation, score/counter invariance.
 - Auto-complete: availability gating and points-neutral completion via engine (engine owns the solver tests).
 
 ## 10. Open Questions / Action Items
 
-- **AI-1:** Hint preview style — animate a ghost card to each destination vs. pulse/highlight source+destination pairs. Coordinate with [`animations`](./animations.md).
+- ~~**AI-1:** Hint preview style~~ — **resolved**: gliding ghost run + destination ring, positioned from `BoardLayout`.
 - **AI-2:** Should the pre-auto-complete board be restorable via undo after auto-complete, or is auto-complete terminal? (v1: terminal.)
-- **AI-3:** Cap the number of hint candidates cycled (e.g., top K) to avoid long loops on busy boards?
+- ~~**AI-3:** Cap the number of hint candidates cycled~~ — **resolved**: no cap; the cycle walks every legal move, since hints enumerate rather than rank.
 
 ## 11. PRD Traceability
 

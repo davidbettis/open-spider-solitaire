@@ -8,18 +8,31 @@ struct GameBoardView: View {
     @Environment(\.scenePhase) private var scenePhase
 
     @State private var interaction = BoardInteraction()
+    @State private var hints = HintController()
     @State private var confirmingNewGame = false
 
     let onExit: () -> Void
 
     var body: some View {
         VStack(spacing: 0) {
-            HUDBar(session: session, onExit: onExit)
+            HUDBar(session: session, onExit: onExit, onDeal: deal)
             tableauArea
-            ControlBar(session: session, confirmingNewGame: $confirmingNewGame)
+            ControlBar(session: session,
+                       confirmingNewGame: $confirmingNewGame,
+                       onHint: { hints.start(board: session.state.board) })
         }
         .environment(interaction)
         .background(feltBackground)
+        // Any tap anywhere cancels the cycle (spec §4.2), so this sits above
+        // the board and the bars and swallows the gesture that cancels it.
+        .overlay {
+            if hints.isCycling {
+                Color.clear
+                    .contentShape(Rectangle())
+                    .onTapGesture { hints.cancel() }
+                    .ignoresSafeArea()
+            }
+        }
         .overlay {
             if session.isWon { WinOverlay(session: session, onExit: onExit) }
         }
@@ -35,6 +48,16 @@ struct GameBoardView: View {
         .onChange(of: scenePhase) { _, phase in
             phase == .active ? session.resume() : session.pause()
         }
+        // A move / deal / undo makes the candidates stale (spec §4.2).
+        .onChange(of: session.state.board) { _, _ in hints.invalidate() }
+    }
+
+    /// Deal, or explain why not: the engine refuses while any column is empty,
+    /// so flash the offending columns rather than leaving a live control that
+    /// silently does nothing (spec §6.3).
+    private func deal() {
+        guard !session.deal() else { return }
+        interaction.flashEmptyColumns(board: session.state.board)
     }
 
     private var tableauArea: some View {
@@ -44,6 +67,11 @@ struct GameBoardView: View {
                 TableauView(tableau: session.state.board.tableau,
                             layout: layout,
                             regionHeight: proxy.size.height)
+                if let candidate = hints.current {
+                    HintLayer(candidate: candidate,
+                              board: session.state.board,
+                              layout: layout)
+                }
                 if let drag = interaction.drag {
                     DragLayer(drag: drag, layout: layout)
                 }

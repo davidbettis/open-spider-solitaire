@@ -40,24 +40,34 @@ struct SetSlots: View {
     @ViewBuilder
     private func slot(_ suit: Suit?, at index: Int) -> some View {
         let shape = RoundedRectangle(cornerRadius: layout.slotSize.width * 0.12)
-        if let suit {
-            shape
-                .fill(.white)
-                // Overlapping white cards need an edge to separate them.
-                .overlay(shape.strokeBorder(.black.opacity(0.35), lineWidth: 0.5))
-                // The visible strip is always flush right, so aligning the pip
-                // trailing and sizing it to that strip centres it in view.
-                .overlay(alignment: .trailing) {
-                    Image(systemName: suit.symbolName)
-                        .font(.system(size: layout.slotSize.width * 0.4))
-                        .foregroundStyle(suit.tint)
-                        .frame(width: visibleWidth(at: index))
-                }
-                .frame(width: layout.slotSize.width, height: layout.slotSize.height)
-                // Cast onto the slot behind, so the stack reads as depth.
-                .shadow(color: .black.opacity(0.35), radius: 1.5, x: 1.5, y: 0)
-        } else {
-            CardOutline(size: layout.slotSize)
+        Group {
+            if let suit {
+                shape
+                    .fill(.white)
+                    // Overlapping white cards need an edge to separate them.
+                    .overlay(shape.strokeBorder(.black.opacity(0.35), lineWidth: 0.5))
+                    // The visible strip is always flush right, so aligning the
+                    // pip trailing and sizing it to that strip centres it in view.
+                    .overlay(alignment: .trailing) {
+                        Image(systemName: suit.symbolName)
+                            .font(.system(size: layout.slotSize.width * 0.4))
+                            .foregroundStyle(suit.tint)
+                            .frame(width: visibleWidth(at: index))
+                    }
+            } else {
+                CardOutline(size: layout.slotSize)
+            }
         }
+        .frame(width: layout.slotSize.width, height: layout.slotSize.height)
+        // Paint every slot as if the one in front of it were opaque, drawing
+        // only the strip that would actually be visible. Filled slots look the
+        // same either way — the card in front already covers the rest — but it
+        // stops the empty outlines from painting in full and crossing each
+        // other into a thicket of dashes.
+        .mask(alignment: .trailing) {
+            Rectangle().frame(width: visibleWidth(at: index))
+        }
+        // Cast onto the slot behind, so the stack reads as depth.
+        .shadow(color: .black.opacity(suit == nil ? 0 : 0.35), radius: 1.5, x: 1.5, y: 0)
     }
 }

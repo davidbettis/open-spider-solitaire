@@ -1,6 +1,6 @@
 # Feature Spec: Animations & Feedback
 
-- **Status:** Core motion layer implemented — glide, flip, instant undo, and the absences. Animated deal, run-clear, and win cascade are outstanding (see §12).
+- **Status:** Implemented.
 - **Owner:** TBD
 - **Source PRD:** [`docs/PRD.md`](../PRD.md)
 - **Spec sequence:** #6. Depends on [`game-engine`](./game-engine.md) (state transitions) and [`game-board-ui`](./game-board-ui.md) (card views, layout, `matchedGeometryEffect` namespace). Sequenced by [`hints-and-autocomplete`](./hints-and-autocomplete.md) for previews/finishes.
@@ -68,7 +68,7 @@ State transitions come from the engine (via the `@Observable` session); the UI d
 |---|---|
 | Relocate run A→B | `matchedGeometryEffect` **glide** of each moved card (by `id`) from source to destination frames. |
 | Initial deal | **Deal** each of the 54 cards from the deck origin to its column slot, **staggered** by `dealStagger` in deal order; tops finish face-up (flip at end of their deal). |
-| Stock deal (+10) | **Deal**+stagger of 10 cards from the stock origin, one per column, landing face-up. |
+| Stock deal (+10) | **Deal**+stagger of 10 cards from the stock origin, one per column, landing face-up. Columns are stacked leftmost-on-top so a card crossing the board to a left column travels *over* the columns it passes, not behind them. |
 | Auto-flip (reveal) | **Flip** (3D `rotation3DEffect` around Y) of the newly exposed card from back to face. |
 | Run-clear (K→A) | **Clear** celebration: the 13 cards lift/sweep off to a "cleared" area with a brief flourish, then removed. |
 | Win (8th run cleared) | **Win cascade** (§6) then summary. |
@@ -78,7 +78,7 @@ State transitions come from the engine (via the `@Observable` session); the UI d
 
 ### 5.1 Driving matched-geometry moves
 
-**Implemented.** `GameBoardView` owns `@Namespace private var cardNamespace`, threaded through `TableauView` to `ColumnView`, which applies `.matchedGeometryEffect(id: card.id, in:)` to each card. The modifier lives on `ColumnView`'s card, not inside `CardView`, because `DragLayer` and `HintLayer` render `CardView`s that must *not* join the namespace — two sources for one id would fight.
+**Implemented.** The same mechanism carries every card motion in the game: a card is matched by `Card.id` wherever it is rendered, so moving it between columns, or from the deck into a column, is one interpolation rather than two separate animations. `GameBoardView` owns `@Namespace private var cardNamespace`, threaded through `TableauView` to `ColumnView`, which applies `.matchedGeometryEffect(id: card.id, in:)` to each card. The modifier lives on `ColumnView`'s card, not inside `CardView`, because `DragLayer` and `HintLayer` render `CardView`s that must *not* join the namespace — two sources for one id would fight.
 
 Every board mutation now picks its motion explicitly, with no default: tap, drag-drop, deal, and auto-complete run inside `withAnimation(Motion.glide)`; undo, Restart, and New Game run inside `Motion.instantly`.
 
@@ -112,13 +112,13 @@ When the engine board changes inside `withAnimation(Motion.glide)`, SwiftUI inte
 ## 10. Acceptance Criteria
 
 - [x] Moving a card/run glides via matched geometry to the correct destination frame; duplicate-rank cards animate to their own targets (stable `id`).
-- [ ] Initial deal and each stock deal animate with a visible stagger; dealt tops end face-up.
+- [x] Initial deal and each stock deal animate with a visible stagger; dealt tops end face-up.
 - [x] Revealing a face-down card plays a flip.
-- [ ] Clearing a K→A run plays the clear celebration and the cards are then gone.
-- [ ] Winning plays the cascade and presents the summary; the player can dismiss without waiting for the cascade to end.
+- [x] Clearing a K→A run plays the clear celebration and the cards are then gone.
+- [x] Winning plays the cascade and presents the summary; the cascade is non-interactive and sits behind the summary, so dismissing never waits on it.
 - [x] **Undo applies instantly with no animation** — `Motion.instantly` applies the restored board inside a `Transaction` with `disablesAnimations`, so matched geometry snaps. Verified by construction; not yet confirmed frame-by-frame on device.
 - [x] No haptic or sound on any path (grep-verified: no `UIFeedbackGenerator`, `AudioServices`, or AVFoundation reference in the source). Invalid *moves* stay silent; the one deliberate exception is the empty-column flash on a refused deal — see [`game-board-ui`](./game-board-ui.md) §6.3.
-- [ ] Auto-complete replays with glide+clear then win; hint previews animate without mutating state.
+- [x] Auto-complete replays with glide+clear then win; hint previews animate without mutating state.
 
 ## 11. Testing Strategy
 
@@ -131,9 +131,9 @@ When the engine board changes inside `withAnimation(Motion.glide)`, SwiftUI inte
 - **AI-1:** Tune all `Motion` durations/curves on device; confirm deal stagger feels good for 54 cards without dragging.
 - **AI-2:** Reconsider Reduce Motion support (PRD flags it as low-effort) — map events → instant and cascade → static.
 - **AI-3:** Whether a tap can fast-forward/skip the initial deal and win cascade.
-- **AI-4:** Cascade implementation choice (`TimelineView` + physics vs. keyframe animation) — pick after a spike. Still open, and the win summary it hands off to needs `WinSummary` from [`high-scores`](./high-scores.md), which is not built.
-- **AI-5:** The animated deal (§5, initial + stock) needs the dealt cards to have a *source* frame at the HUD deck before they exist in a column — most likely `DeckIndicator` rendering the top of the stock into the same namespace. Not attempted yet.
-- **AI-6:** Run-clear celebration (§5) needs the old→new board diff described in §11 to identify the 13 departing cards; that diff is deliberately not built yet, since nothing else currently consumes it.
+- ~~**AI-4:** Cascade implementation choice~~ — **resolved**: `TimelineView` + closed-form physics, drawn in a `Canvas`. Each card's position is a pure function of elapsed time (launch delay, horizontal speed, gravity, damped floor bounces), so nothing is stepped or stored and the layer stays disposable. `WinSummary` now exists and the summary renders over the cascade.
+- ~~**AI-5:** The animated deal needs the dealt cards to have a source frame at the HUD deck~~ — **resolved**, and exactly that way: `DeckIndicator` renders the waiting cards into the shared namespace, stacked on the top of the fan and always face-down, so they have somewhere to fly from. The opening layout uses the same mechanism — the tableau renders empty for one frame while all 54 wait at the deck. Stagger comes from a per-card `.transaction` keyed on destination column.
+- ~~**AI-6:** Run-clear celebration needs the old→new board diff~~ — **resolved**: `BoardDiff` now exists and is unit-tested, and both the clear celebration and the deal stagger consume it.
 
 ## 13. PRD Traceability
 

@@ -1,7 +1,10 @@
 import SwiftUI
 
 /// Win summary: final score, final time, and which records fell
-/// (high-scores §7/§9). The cascade itself is still `animations.md`'s work.
+/// (high-scores §7/§9).
+///
+/// The dimming scrim is *not* here — `GameBoardView` draws it beneath the win
+/// cascade, so the cascading cards read bright rather than through a veil.
 struct WinOverlay: View {
     let session: GameSession
     /// `nil` only for the instant between the win and it being recorded.
@@ -10,7 +13,6 @@ struct WinOverlay: View {
 
     var body: some View {
         ZStack {
-            Color.black.opacity(0.5).ignoresSafeArea()
             VStack(spacing: 16) {
                 Text("You Win!").font(.largeTitle.bold())
                 Text("Score \(session.displayScore)  ·  \(session.elapsed.clockString)")

@@ -19,6 +19,16 @@ struct GameBoardView: View {
     @State private var canFinish = false
     /// Recorded once per win, and cleared when a fresh game begins.
     @State private var winSummary: WinSummary?
+    /// Cards the most recent deal delivered, held just long enough to stagger
+    /// their arrival, then cleared so ordinary moves animate normally.
+    @State private var justDealt: Set<Int> = []
+    /// The run currently sweeping out of the tableau, if any.
+    @State private var clearing: ClearingRun?
+    @State private var clearToken = 0
+    /// While set, the opening layout has not been dealt yet: the tableau
+    /// renders empty and these cards wait at the deck, so they have somewhere
+    /// to fly *from* (spec §5, initial deal).
+    @State private var dealingIn: [Card]?
 
     let persistence: PersistenceService
     let onExit: () -> Void
@@ -46,12 +56,15 @@ struct GameBoardView: View {
                 }
             }
             // A move / deal / undo makes the hint candidates stale (spec §4.2).
-            .onChange(of: session.state.board) { _, _ in
+            .onChange(of: session.state.board) { old, new in
                 hints.invalidate()
                 refreshCanFinish()
                 autosave()
+                react(to: BoardDiff(from: old, to: new), previous: old)
             }
             .onAppear { refreshCanFinish() }
+            // Runs on appear and again whenever a new deal is drawn.
+            .task(id: session.state.initialBoard) { await dealIn() }
             // A game counts as started on its first forward move, which is
             // exactly when the engine starts the clock (high-scores §6).
             .onChange(of: session.state.timerStarted) { _, started in
@@ -71,7 +84,8 @@ struct GameBoardView: View {
 
     private var boardStack: some View {
         VStack(spacing: 0) {
-            HUDBar(session: session, onExit: onExit, onDeal: deal)
+            HUDBar(session: session, nextDeal: cardsAtDeck,
+                   cardNamespace: cardNamespace, onExit: onExit, onDeal: deal)
             tableauArea
             ControlBar(session: session,
                        confirmingNewGame: $confirmingNewGame,
@@ -95,8 +109,57 @@ struct GameBoardView: View {
     @ViewBuilder
     private var winLayer: some View {
         if session.isWon {
-            WinOverlay(session: session, summary: winSummary, onExit: onExit)
+            ZStack {
+                // Scrim first, then the cascade over it, then the summary — so
+                // the cards stay bright and the summary stays readable.
+                Color.black.opacity(0.5)
+                WinCascadeLayer(completedRuns: session.state.board.completedRuns,
+                                cardSize: cascadeCardSize)
+                WinOverlay(session: session, summary: winSummary, onExit: onExit)
+            }
+            .ignoresSafeArea()
         }
+    }
+
+    /// Empty while the opening layout is still at the deck, so the cards have
+    /// a real distance to travel.
+    private var visibleTableau: [[Card]] {
+        dealingIn == nil
+            ? session.state.board.tableau
+            : Array(repeating: [], count: BoardLayout.columnCount)
+    }
+
+    /// What the deck is holding: the opening layout mid-deal, else the next
+    /// stock deal.
+    private var cardsAtDeck: [Card] {
+        dealingIn ?? Array(session.state.board.stock.suffix(10))
+    }
+
+    /// Deal the opening layout out of the deck rather than snapping it onto the
+    /// table. Only for an untouched game — resuming a save should land on the
+    /// board the player left, not replay its deal.
+    private func dealIn() async {
+        guard !session.isWon, session.state.moveCount == 0, !session.state.timerStarted else { return }
+        let cards = session.state.board.tableau.flatMap { $0 }
+        guard !cards.isEmpty else { return }
+
+        dealingIn = cards
+        justDealt = Set(cards.map(\.id))
+        // One frame at the deck, so the flight starts from there.
+        try? await Task.sleep(for: .milliseconds(60))
+        guard !Task.isCancelled else { return }
+        withAnimation(Motion.deal) { dealingIn = nil }
+
+        let settle = Motion.dealStagger * Double(BoardLayout.columnCount) + 0.6
+        try? await Task.sleep(for: .seconds(settle))
+        justDealt = []
+    }
+
+    /// The cascade draws at roughly a tableau card's size, without needing the
+    /// tableau's own layout.
+    private var cascadeCardSize: CGSize {
+        let width: CGFloat = 58
+        return CGSize(width: width, height: width * BoardLayout.aspectRatio)
     }
 
     /// A new deal replaces the old game, so its snapshot goes with it
@@ -115,6 +178,41 @@ struct GameBoardView: View {
     private func restartDeal() {
         Motion.instantly { session.restart() }
         Task { await persistence.deleteGame() }
+    }
+
+    /// Turn a board change into motion (spec §5): a dealt row is staggered
+    /// per column, and the stagger flag is dropped once the row has landed so
+    /// later moves are not delayed by it.
+    private func react(to diff: BoardDiff, previous: Board) {
+        if !diff.dealtCardIDs.isEmpty {
+            justDealt = diff.dealtCardIDs
+            let settle = Motion.dealStagger * Double(BoardLayout.columnCount) + 0.4
+            Task {
+                try? await Task.sleep(for: .seconds(settle))
+                justDealt = []
+            }
+        }
+
+        if !diff.clearedCardIDs.isEmpty, let run = clearedRun(diff, in: previous) {
+            clearing = run
+            Task {
+                try? await Task.sleep(for: .milliseconds(900))
+                if clearing?.id == run.id { clearing = nil }
+            }
+        }
+    }
+
+    /// Rebuild the departing run from the board as it was, so the celebration
+    /// starts from exactly where the cards lay.
+    private func clearedRun(_ diff: BoardDiff, in previous: Board) -> ClearingRun? {
+        for (column, cards) in previous.tableau.enumerated() {
+            let leaving = cards.filter { diff.clearedCardIDs.contains($0.id) }
+            if leaving.count == 13 {
+                clearToken += 1
+                return ClearingRun(id: clearToken, cards: leaving, column: column)
+            }
+        }
+        return nil
     }
 
     /// Autosave the in-progress game, debounced inside the actor. A game with
@@ -147,7 +245,7 @@ struct GameBoardView: View {
     /// silently does nothing (spec §6.3).
     private func deal() {
         var dealt = false
-        withAnimation(Motion.glide) { dealt = session.deal() }
+        withAnimation(Motion.deal) { dealt = session.deal() }
         guard !dealt else { return }
         interaction.flashEmptyColumns(board: session.state.board)
     }
@@ -156,10 +254,11 @@ struct GameBoardView: View {
         GeometryReader { proxy in
             let layout = BoardLayout(size: proxy.size, tableau: session.state.board.tableau)
             ZStack(alignment: .top) {
-                TableauView(tableau: session.state.board.tableau,
+                TableauView(tableau: visibleTableau,
                             layout: layout,
                             regionHeight: proxy.size.height,
-                            cardNamespace: cardNamespace)
+                            cardNamespace: cardNamespace,
+                            justDealtIDs: justDealt)
                 if let candidate = hints.current {
                     HintLayer(candidate: candidate,
                               board: session.state.board,
@@ -167,6 +266,9 @@ struct GameBoardView: View {
                 }
                 if let drag = interaction.drag {
                     DragLayer(drag: drag, layout: layout)
+                }
+                if let clearing {
+                    ClearedRunLayer(run: clearing, layout: layout)
                 }
                 if canFinish {
                     FinishGameButton(action: finish)

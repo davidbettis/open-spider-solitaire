@@ -5,6 +5,10 @@ import SwiftUI
 /// the deal control — on the right.
 struct HUDBar: View {
     let session: GameSession
+    /// Cards waiting at the deck — the next stock deal, or the whole opening
+    /// layout while it is still being dealt in.
+    let nextDeal: [Card]
+    let cardNamespace: Namespace.ID
     let onExit: () -> Void
     let onDeal: () -> Void
 
@@ -22,7 +26,9 @@ struct HUDBar: View {
                 centreStats
                 Spacer(minLength: 12)
                 DeckIndicator(dealsRemaining: session.state.board.dealsRemaining,
+                              nextDeal: nextDeal,
                               layout: layout,
+                              cardNamespace: cardNamespace,
                               onDeal: onDeal)
             }
             .frame(width: proxy.size.width, height: proxy.size.height)

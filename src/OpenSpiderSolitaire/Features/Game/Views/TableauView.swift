@@ -6,6 +6,7 @@ struct TableauView: View {
     let layout: BoardLayout
     let regionHeight: CGFloat
     let cardNamespace: Namespace.ID
+    let justDealtIDs: Set<Int>
 
     var body: some View {
         HStack(spacing: layout.gutter) {
@@ -14,7 +15,14 @@ struct TableauView: View {
                            cards: tableau[column],
                            layout: layout,
                            regionHeight: regionHeight,
-                           cardNamespace: cardNamespace)
+                           cardNamespace: cardNamespace,
+                           justDealtIDs: justDealtIDs)
+                    // Leftmost column on top. Dealt cards fly right-to-left
+                    // from the deck, so a card bound for column i crosses every
+                    // column to its right; this puts it over them instead of
+                    // behind. Columns never overlap at rest, so the order is
+                    // invisible except in flight.
+                    .zIndex(Double(BoardLayout.columnCount - column))
             }
         }
         .padding(.horizontal, layout.gutter)

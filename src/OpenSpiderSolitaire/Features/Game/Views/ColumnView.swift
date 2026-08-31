@@ -11,6 +11,9 @@ struct ColumnView: View {
     /// Shared with every other column so a card gliding between them is matched
     /// by its stable `Card.id` (spec §5.1).
     let cardNamespace: Namespace.ID
+    /// Cards this deal just delivered, so each column's arrival can be offset
+    /// in time and the row lands as a ripple rather than all at once.
+    let justDealtIDs: Set<Int>
 
     @Environment(GameSession.self) private var session
     @Environment(BoardInteraction.self) private var interaction
@@ -61,6 +64,11 @@ struct ColumnView: View {
         let isDragging = interaction.drag.map { $0.sourceColumn == index && position >= $0.sourceIndex } ?? false
         return CardView(card: card, size: layout.cardSize)
             .matchedGeometryEffect(id: card.id, in: cardNamespace)
+            .transaction { transaction in
+                guard justDealtIDs.contains(card.id) else { return }
+                transaction.animation = Motion.deal
+                    .delay(Double(index) * Motion.dealStagger)
+            }
             .offset(y: layout.cardY(index: position, in: cards))
             .zIndex(Double(position))
             .opacity(isDragging ? 0 : 1)

@@ -74,6 +74,6 @@ struct HUDLayoutTests {
         let layout = HUDLayout(containerWidth: 0, contentHeight: 0)
         #expect(layout.slotSize.width >= 1)
         #expect(layout.slotSize.height >= 1)
-        #expect(layout.deckWidth > layout.slotSize.width)   // depth offsets present
+        #expect(layout.deckWidth == layout.slotSize.width)   // the deck is one fixed card
     }
 }

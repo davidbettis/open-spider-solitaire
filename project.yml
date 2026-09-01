@@ -41,6 +41,10 @@ targets:
         ASSETCATALOG_COMPILER_GLOBAL_ACCENT_COLOR_NAME: AccentColor
         INFOPLIST_KEY_UILaunchScreen_Generation: YES
         INFOPLIST_KEY_UIApplicationSupportsIndirectInputEvents: YES
+        # Answers App Store Connect's export-compliance question up front, so
+        # it stops asking on every upload. True here: the app makes no network
+        # calls and uses no crypto APIs at all (see Core/Networking/README.md).
+        INFOPLIST_KEY_ITSAppUsesNonExemptEncryption: NO
         # Xcode's General tab writes these into the generated .xcodeproj, which is
         # gitignored and rebuilt by `xcodegen generate` — so they only stick here.
         INFOPLIST_KEY_CFBundleDisplayName: Open Spider Solitaire

@@ -65,3 +65,18 @@ final class InMemoryHighScoresStorage: HighScoresStorage {
 func makeEntry(score: Int, time: TimeInterval, day: Int = 0) -> ScoreEntry {
     ScoreEntry(score: score, time: time, date: Date(timeIntervalSince1970: TimeInterval(day) * 86_400))
 }
+
+/// In-memory double for ``SettingsStorage``, mirroring
+/// ``InMemoryHighScoresStorage``.
+final class InMemorySettingsStorage: SettingsStorage {
+    private(set) var stored: AppSettings?
+    private(set) var saveCount = 0
+
+    init(_ initial: AppSettings? = nil) { stored = initial }
+
+    func load() -> AppSettings? { stored }
+    func save(_ settings: AppSettings) {
+        stored = settings
+        saveCount += 1
+    }
+}

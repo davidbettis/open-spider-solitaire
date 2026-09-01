@@ -1,18 +1,16 @@
 import SwiftUI
 
-/// Title screen: the logo over the app name, a difficulty picker, and Start
-/// Game, with Settings and High Scores on a bottom toolbar.
+/// Title screen: the logo over the app name, then the three places to go.
+///
+/// Difficulty is not chosen here. It lives in Settings and persists, so Start
+/// Game is one tap and the choice is not re-made every launch.
 ///
 /// Uses system surfaces and the system tint throughout, so it follows the
 /// platform and the user's appearance setting.
 struct MenuView: View {
-    let onStart: (SuitMode) -> Void
-    let onHighScores: () -> Void
+    let onStart: () -> Void
     let onSettings: () -> Void
-
-    /// Difficulty is now chosen first and started second, so the mode has to
-    /// live somewhere between the two taps.
-    @State private var mode: SuitMode = .one
+    let onHighScores: () -> Void
 
     var body: some View {
         ZStack {
@@ -20,19 +18,9 @@ struct MenuView: View {
 
             VStack(spacing: 30) {
                 header
-                difficulty
-                startButton
+                actions
             }
             .padding()
-        }
-        .toolbar {
-            ToolbarItemGroup(placement: .bottomBar) {
-                // Plain titles: a bottom bar collapses a Label to its icon
-                // whatever label style is asked for, and these want naming.
-                Button("Settings", action: onSettings)
-                Spacer()
-                Button("High Scores", action: onHighScores)
-            }
         }
     }
 
@@ -51,43 +39,31 @@ struct MenuView: View {
         }
     }
 
-    private var difficulty: some View {
-        VStack(spacing: 10) {
-            Text("Choose difficulty")
-                .font(.subheadline)
-                .foregroundStyle(.secondary)
-
-            Picker("Difficulty", selection: $mode) {
-                ForEach(SuitMode.allCases, id: \.self) { mode in
-                    Text(mode.shortName).tag(mode)
-                }
+    /// Start Game is prominent; the other two are peers below it.
+    private var actions: some View {
+        VStack(spacing: 12) {
+            Button(action: onStart) {
+                Text("Start Game").fontWeight(.semibold).frame(maxWidth: 320).padding(.vertical, 6)
             }
-            .pickerStyle(.segmented)
-            .frame(maxWidth: 320)
+            .buttonStyle(.borderedProminent)
 
-            // The segments only have room for the suit count, so the
-            // difficulty word follows the selection here instead.
-            Text(mode.difficultyName)
-                .font(.footnote.weight(.medium))
-                .foregroundStyle(.secondary)
-                .animation(nil, value: mode)
-        }
-    }
+            Button(action: onSettings) {
+                Text("Settings").frame(maxWidth: 320).padding(.vertical, 6)
+            }
+            .buttonStyle(.bordered)
 
-    private var startButton: some View {
-        Button { onStart(mode) } label: {
-            Text("Start Game")
-                .fontWeight(.semibold)
-                .frame(maxWidth: 320)
-                .padding(.vertical, 6)
+            Button(action: onHighScores) {
+                Text("High Scores").frame(maxWidth: 320).padding(.vertical, 6)
+            }
+            .buttonStyle(.bordered)
         }
-        .buttonStyle(.borderedProminent)
         .controlSize(.large)
+        .buttonBorderShape(.capsule)
     }
 }
 
 #Preview {
     NavigationStack {
-        MenuView(onStart: { _ in }, onHighScores: {}, onSettings: {})
+        MenuView(onStart: {}, onSettings: {}, onHighScores: {})
     }
 }

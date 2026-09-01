@@ -13,6 +13,7 @@ enum Route: Hashable {
 struct RootView: View {
     @State private var game: GameSession?
     @State private var highScores: HighScoresStore
+    @State private var settings: SettingsStore
     @State private var path: [Route] = []
 
     private let persistence: PersistenceService
@@ -22,6 +23,8 @@ struct RootView: View {
         self.persistence = persistence
         _highScores = State(initialValue: HighScoresStore(
             storage: PersistedHighScoresStorage(persistence: persistence)))
+        _settings = State(initialValue: SettingsStore(
+            storage: PersistedSettingsStorage(persistence: persistence)))
 
         // Resume before the first frame, so the menu never flashes over a game
         // that is still there (persistence spec §6.3).
@@ -48,8 +51,8 @@ struct RootView: View {
             } else {
                 NavigationStack(path: $path) {
                     MenuView(onStart: startGame,
-                             onHighScores: { path.append(.highScores) },
-                             onSettings: { path.append(.settings) })
+                             onSettings: { path.append(.settings) },
+                             onHighScores: { path.append(.highScores) })
                         .navigationDestination(for: Route.self) { route in
                             switch route {
                             case .highScores: HighScoresView()
@@ -61,11 +64,17 @@ struct RootView: View {
             }
         }
         .environment(highScores)
+        .environment(settings)
+        // Applied at the root so it covers the board, the menu, and everything
+        // pushed on top of them. `nil` for .system means "do not override".
+        .preferredColorScheme(settings.appearance.colorScheme)
     }
 
-    private func startGame(_ mode: SuitMode) {
+    /// Difficulty comes from Settings, not from the caller: the title screen no
+    /// longer asks, so the stored preference is the only source.
+    private func startGame() {
         var rng = SystemRandomNumberGenerator()
-        game = GameSession(mode: mode, rng: &rng)
+        game = GameSession(mode: settings.suitMode, rng: &rng)
     }
 }
 

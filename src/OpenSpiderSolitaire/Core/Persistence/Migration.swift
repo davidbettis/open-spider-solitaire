@@ -63,3 +63,29 @@ struct GameStateV1ToV2: Migration {
         return try JSONSerialization.data(withJSONObject: root)
     }
 }
+
+/// `DurableData` v1 → v2: v2 added `settings`, which v1 payloads predate.
+/// The defaults are what the app already behaved like before the settings
+/// existed - 1-suit difficulty and the system appearance - so an existing
+/// player notices nothing, and crucially keeps their high scores. Without
+/// this step a v1 file would fail to upgrade and reset to defaults.
+struct DurableDataV1ToV2: Migration {
+    let from = 1
+    let to = 2
+
+    func migrate(_ json: Data) throws -> Data {
+        guard var root = try JSONSerialization.jsonObject(with: json) as? [String: Any],
+              var body = root["body"] as? [String: Any]
+        else { throw PersistenceFailure.unreadable }
+
+        if body["settings"] == nil {
+            body["settings"] = ["suitMode": SuitMode.one.rawValue,
+                                "appearance": Appearance.system.rawValue]
+        }
+        root["body"] = body
+        // DurableData carries no schemaVersion of its own; the envelope is the
+        // single authority (see HighScoresData's note).
+        root["schemaVersion"] = 2
+        return try JSONSerialization.data(withJSONObject: root)
+    }
+}

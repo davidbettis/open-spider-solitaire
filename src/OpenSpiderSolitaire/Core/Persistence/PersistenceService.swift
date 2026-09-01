@@ -16,15 +16,18 @@ actor PersistenceService {
     private let game: JSONFileStore
     private let durable: JSONFileStore
     private let gameMigrations: MigrationChain
+    private let durableMigrations: MigrationChain
 
     private var pendingSave: Task<Void, Never>?
 
     init(game: JSONFileStore = .inApplicationSupport("game.json"),
          durable: JSONFileStore = .inApplicationSupport("durable.json"),
-         gameMigrations: MigrationChain = MigrationChain([GameStateV1ToV2()])) {
+         gameMigrations: MigrationChain = MigrationChain([GameStateV1ToV2()]),
+         durableMigrations: MigrationChain = MigrationChain([DurableDataV1ToV2()])) {
         self.game = game
         self.durable = durable
         self.gameMigrations = gameMigrations
+        self.durableMigrations = durableMigrations
     }
 
     // MARK: In-progress game
@@ -75,10 +78,12 @@ actor PersistenceService {
     }
 
     /// Durable data never throws: a failure resets to defaults (spec §9).
+    /// It is migrated like the game snapshot, so adding a field to
+    /// ``DurableData`` does not silently discard a player's high scores.
     nonisolated func loadDurableNow() -> DurableData {
         (try? PersistenceService.decode(
             DurableData.self, from: durable, current: DurableData.currentSchemaVersion,
-            migrations: MigrationChain())) ?? DurableData()
+            migrations: durableMigrations)) ?? DurableData()
     }
 
     /// Durable writes are small and rare, so they land immediately rather than

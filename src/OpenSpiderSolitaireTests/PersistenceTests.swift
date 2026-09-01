@@ -68,6 +68,30 @@ struct PersistenceTests {
         #expect(service.loadGameNow() == nil)
     }
 
+    @Test("A v1 durable payload keeps its high scores and gains default settings")
+    func durableV1Migrates() throws {
+        let game = tempStore(), durable = tempStore()
+        defer { game.delete(); durable.delete() }
+
+        // A v1 payload: high scores, and no settings key at all.
+        var scores = HighScoresData()
+        scores.leaderboards[.two] = Leaderboard(entries: [makeEntry(score: 777, time: 123)])
+
+        let v1: [String: Any] = [
+            "schemaVersion": 1,
+            "body": ["highScores": try JSONSerialization.jsonObject(
+                with: JSONEncoder().encode(scores))]
+        ]
+        durable.write(try JSONSerialization.data(withJSONObject: v1))
+
+        // Without the migration this fails to upgrade and resets to defaults,
+        // losing the player's scores - the regression this guards.
+        let loaded = service(game: game, durable: durable).loadDurableNow()
+        #expect(loaded.highScores.leaderboards[.two]?.entries.first?.score == 777)
+        #expect(loaded.settings == AppSettings())
+        #expect(loaded.settings.suitMode == .one)
+    }
+
     @Test("Durable data round-trips and defaults when absent")
     func durableRoundTrips() {
         let game = tempStore(), durable = tempStore()

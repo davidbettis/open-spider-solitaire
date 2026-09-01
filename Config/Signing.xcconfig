@@ -1,0 +1,26 @@
+// Code signing. This file is committed and intentionally holds no team.
+//
+// DEVELOPMENT_TEAM is your Apple Developer Team ID. It is not a secret (it
+// ships inside every distributed app), but it is personal: baking one
+// developer's team into the repo makes every other clone fail to sign until
+// they change it. So it is kept out of git.
+//
+// To build with your own team, create Config/Signing.local.xcconfig (already
+// gitignored) containing one line:
+//
+//     DEVELOPMENT_TEAM = YOURTEAMID
+//
+// Find your Team ID with:
+//   security find-identity -v -p codesigning        # pick your identity
+//   security find-certificate -c "<that identity>" -p \
+//     | openssl x509 -noout -subject -nameopt multiline
+// It is the organizationalUnitName, NOT the value in parentheses in the
+// identity string (that one is the certificate id).
+//
+// Without the local file the build still generates; Xcode simply asks you to
+// choose a team.
+
+DEVELOPMENT_TEAM =
+
+// Optional include: silently skipped when the file does not exist.
+#include? "Signing.local.xcconfig"

@@ -24,3 +24,6 @@ Package.resolved
 # Fastlane / misc
 fastlane/report.xml
 *.log
+
+# Local code-signing override (personal Team ID; see Config/Signing.xcconfig)
+Config/Signing.local.xcconfig

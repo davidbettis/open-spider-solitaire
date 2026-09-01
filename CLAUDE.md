@@ -5,7 +5,8 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 # Project: OpenSpiderSolitaire
 
 ## Quick Reference
-- **Platform**: iOS 17+ / macOS 14+
+- **Platform**: iOS 17+ — iPhone is the shipping target (`TARGETED_DEVICE_FAMILY = 1`); iPad is planned for a later version
+- **Orientation**: portrait and landscape (no upside-down while iPhone-only)
 - **Language**: Swift 6.0
 - **UI Framework**: SwiftUI
 - **Architecture**: MVVM with @Observable
@@ -91,8 +92,46 @@ enum AppError: LocalizedError {
 - Use Swift Testing framework (@Test, #expect)
 - Minimum 80% code coverage for business logic
 
+## Device Support: iPhone Now, iPad Later
+**iPhone is the primary and only shipping target** (`TARGETED_DEVICE_FAMILY = 1`).
+**iPad is a planned secondary target, deferred to a later version** — it is not cut,
+just not built yet.
+
+Until that version is scheduled:
+- Build and verify for iPhone. The board UI is designed and verified at iPhone sizes;
+  there is no iPad design to build against yet, so an iPad build would ship a stretched
+  iPhone layout.
+- Do not add iPad layouts, `~ipad` Info.plist keys, or iPad-only APIs (Slide Over,
+  Stage Manager, pointer/hover) ahead of that work.
+- **Do** keep new UI layout-driven rather than hardcoded to iPhone geometry — prefer
+  size classes and the existing `BoardLayout` / `HUDLayout` sizing math over magic
+  numbers, so the later iPad pass is a layout problem and not a rewrite.
+
+### What flipping on iPad will require
+1. Set `TARGETED_DEVICE_FAMILY: "1,2"` on **each target's** `settings.base` in
+   `project.yml` (see the trap below), then `xcodegen generate`.
+2. Add the fourth orientation: a universal build is **rejected at App Store validation**
+   unless `UISupportedInterfaceOrientations` lists all four, including
+   `UIInterfaceOrientationPortraitUpsideDown`, for iPad multitasking. The current list
+   is portrait + both landscapes, which is valid only while the app is iPhone-only.
+3. Design an actual iPad board layout before enabling any of the above.
+
+**Setting the device family is a trap.** XcodeGen writes its own defaults at the *target*
+level, and those override the project-level `settings.base`. `TARGETED_DEVICE_FAMILY`
+must therefore be declared on **each target's** `settings.base` — set only at the project
+level, it is silently overridden with `"1,2"` and the app ships as universal by accident
+(this is exactly how the App Store validation rejection above was first hit). After
+changing it, verify the built product, not the YAML:
+`plutil -p <built .app>/Info.plist | grep -A2 UIDeviceFamily`.
+
+(An inert `AppIcon76x76@2x~ipad.png` / `CFBundleIcons~ipad` already appears in the bundle;
+that comes from the modern single-size `"universal"` app icon and is harmless — device
+support is determined by `UIDeviceFamily`, not icon idioms.)
+
 ## macOS Support
-This app runs on Mac as "Designed for iPad" (not Mac Catalyst or native macOS). This means:
+While the app is iPhone-only it runs on Apple Silicon Macs as **"Designed for iPhone"**
+(not Mac Catalyst or native macOS). It will present as "Designed for iPad" once the iPad
+target above is enabled; either way, the rules are the same:
 - `#if os(macOS)` is **always false** — do NOT use it for Mac-specific behavior
 - Use `ProcessInfo.processInfo.isiOSAppOnMac` for runtime Mac detection instead
 - UIKit types like `UIImage` are available on Mac (no need for `#if canImport(UIKit)` guards)

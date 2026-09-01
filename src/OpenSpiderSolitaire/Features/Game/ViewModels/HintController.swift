@@ -2,14 +2,16 @@ import Foundation
 import Observation
 
 /// The hint cycle's state machine (spec §4.2): steps through every legal next
-/// move one at a time and loops. Preview-only — it reads the board and never
+/// move one at a time and then stops. It runs the list **once** rather than
+/// looping, so an unattended hint ends on its own instead of cycling forever.
+/// Preview-only — it reads the board and never
 /// mutates it, so a hint costs points, moves, and undos nothing. The timer
 /// keeps running, which is the whole price of a hint.
 @MainActor
 @Observable
 final class HintController {
     /// How long each candidate is previewed before the cycle advances.
-    static let stepDuration: Duration = .milliseconds(1100)
+    static let stepDuration: Duration = .milliseconds(1500)
 
     private(set) var candidates: [HintCandidate] = []
     private(set) var index = 0
@@ -39,11 +41,16 @@ final class HintController {
         startTicking()
     }
 
-    /// Advance to the next candidate, wrapping at the end. Exposed so the
-    /// state machine is testable without waiting on wall-clock time.
+    /// Advance to the next candidate, ending the cycle once the last one has
+    /// had its turn. Exposed so the state machine is testable without waiting
+    /// on wall-clock time.
     func advance() {
         guard isCycling, !candidates.isEmpty else { return }
-        index = (index + 1) % candidates.count
+        guard index + 1 < candidates.count else {
+            cancel()   // every possibility shown; stop rather than loop
+            return
+        }
+        index += 1
     }
 
     /// Cancel on any tap (spec §4.2) — clears the preview immediately.

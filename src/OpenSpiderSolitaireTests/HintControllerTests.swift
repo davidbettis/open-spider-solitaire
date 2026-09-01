@@ -31,14 +31,40 @@ struct HintControllerTests {
         #expect(controller.current?.destinationColumn == 1)
     }
 
-    @Test("Advancing steps through candidates and wraps")
-    func advanceWraps() {
+    @Test("Advancing steps through the candidates in order")
+    func advanceStepsThrough() {
         let controller = HintController()
         controller.start(board: twoCandidateBoard())
+        #expect(controller.current?.destinationColumn == 1)
         controller.advance()
         #expect(controller.current?.destinationColumn == 2)
+    }
+
+    @Test("The cycle ends after the last candidate rather than looping")
+    func cycleEndsAfterTheLastCandidate() {
+        let controller = HintController()
+        controller.start(board: twoCandidateBoard())
+        controller.advance()          // second and final candidate
+        #expect(controller.isCycling)
+
+        controller.advance()          // nothing left to show
+        #expect(!controller.isCycling)
+        #expect(controller.current == nil)
+        #expect(controller.candidates.isEmpty)
+    }
+
+    @Test("A single-candidate board ends after showing that one move")
+    func singleCandidateEnds() {
+        var tableau: [[Card]] = (0..<10).map { [makeCard(900 + $0, .two, .clubs)] }
+        tableau[0] = [makeCard(1, .queen, .spades)]
+        tableau[1] = [makeCard(2, .king, .hearts)]
+        let board = Board(tableau: tableau, stock: [], completedRuns: [])
+
+        let controller = HintController()
+        controller.start(board: board)
+        #expect(controller.candidates.count == 1)
         controller.advance()
-        #expect(controller.current?.destinationColumn == 1)   // looped
+        #expect(!controller.isCycling)
     }
 
     @Test("A tap cancels the cycle and clears the preview")

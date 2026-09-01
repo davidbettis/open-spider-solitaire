@@ -19,7 +19,7 @@ This spec owns the UX state machines and candidate ordering; the underlying lega
 ## 2. Goals / Non-Goals
 
 **Goals**
-- Cycle a hint through legal moves, one card→destination at a time, animated.
+- Cycle a hint through legal moves, one card→destination at a time, animated, **once through** — the cycle ends after the last candidate rather than repeating.
 - Cancel the hint cycle on any tap.
 - Keep hints **free** — they cost real time (timer keeps running) but zero points, and mutate no state.
 - Detect when auto-complete is available and offer it.
@@ -58,7 +58,7 @@ struct HintProvider {
 
 - For each column, take its top movable run (and legal sub-runs), and for each, enumerate legal destinations (engine `Rules.canPlace`).
 - **Ordering is a plain scan, deliberately not strategic**: source column left to right, shortest run first within a column, then destination left to right. Hints report the moves that *exist*; ranking them by quality would make the assist play the game for the player. (This supersedes an earlier draft that ordered by the auto-move priority.)
-- Every legal move is cycled — there is no top-K cap (resolves AI-3).
+- Every legal move is cycled — there is no top-K cap (resolves AI-3). The cycle runs the list **once** and stops, so even a busy board's long list ends on its own; any tap cancels sooner.
 - De-duplicate trivially equivalent suggestions (same run to the same destination).
 - If there are **no** candidates, the Hint control is a no-op (optionally briefly disabled); no feedback beyond that (consistent with "no invalid-move feedback").
 
@@ -67,7 +67,8 @@ UI-only ephemeral state in a `@MainActor @Observable HintController` (or `@State
 
 ```
 idle ──tap Hint──▶ cycling(index: 0)
-cycling(i) ──animation completes──▶ cycling(i+1 mod count)   // loops through candidates
+cycling(i) ──step elapses, i+1 < count──▶ cycling(i+1)       // next candidate
+cycling(last) ──step elapses──▶ idle                         // all shown; stops
 cycling(_) ──any board tap / gesture / control──▶ idle       // cancel
 idle ──game state changes (move/deal/undo)──▶ idle           // candidates invalidated
 ```
@@ -106,7 +107,7 @@ Two implementation notes:
 ## 8. Acceptance Criteria
 
 - [x] Hint enumerates all legal candidate moves for the current board, in scan order, de-duplicated.
-- [x] The hint cycle advances through candidates and loops; it animates previews without changing the board or any counter.
+- [x] The hint cycle advances through candidates and then stops; it animates previews without changing the board or any counter.
 - [x] Any tap cancels the cycle immediately and clears the preview.
 - [x] A board mutation (move/deal/undo) exits the hint cycle.
 - [x] With no legal moves, Hint is an inert no-op.

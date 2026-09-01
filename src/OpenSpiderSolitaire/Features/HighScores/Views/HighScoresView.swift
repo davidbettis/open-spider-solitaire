@@ -6,6 +6,7 @@ struct HighScoresView: View {
     @Environment(HighScoresStore.self) private var store
 
     @State private var mode: SuitMode = .one
+    @State private var confirmingReset = false
 
     private var leaderboard: Leaderboard { store.leaderboard(mode) }
     private var stats: ModeStats { store.stats(mode) }
@@ -33,9 +34,22 @@ struct HighScoresView: View {
         }
         .navigationTitle("High Scores")
         .navigationBarTitleDisplayMode(.inline)
+        // Reset lives here rather than on the title screen: it is the screen
+        // showing the data it clears (spec §8 still gates it on a confirmation).
+        .toolbar {
+            ToolbarItem(placement: .topBarTrailing) {
+                Button("Reset", role: .destructive) { confirmingReset = true }
+                    .disabled(store.data.leaderboards.isEmpty && store.data.stats.isEmpty)
+            }
+        }
+        .confirmationDialog("Reset all high scores?", isPresented: $confirmingReset,
+                            titleVisibility: .visible) {
+            Button("Reset Scores", role: .destructive) { store.resetAll() }
+            Button("Cancel", role: .cancel) {}
+        } message: {
+            Text("Every mode's leaderboard and stats are cleared. This cannot be undone.")
+        }
         .toolbarBackground(.visible, for: .navigationBar)
-        // The bar renders light by default, which clashes with the felt.
-        .toolbarColorScheme(.dark, for: .navigationBar)
     }
 
     private var summaryRow: some View {
@@ -48,14 +62,14 @@ struct HighScoresView: View {
                  : stats.winRate.formatted(.percent.precision(.fractionLength(0))))
         }
         .padding(.vertical, 10)
-        .background(.black.opacity(0.25), in: RoundedRectangle(cornerRadius: 12))
+        .background(Palette.bar, in: RoundedRectangle(cornerRadius: 12))
         .padding(.horizontal)
     }
 
     private func stat(_ title: String, _ value: String) -> some View {
         VStack(spacing: 2) {
-            Text(title).font(.caption2).foregroundStyle(.white.opacity(0.7))
-            Text(value).font(.headline.monospacedDigit()).foregroundStyle(.white)
+            Text(title).font(.caption2).foregroundStyle(.secondary)
+            Text(value).font(.headline.monospacedDigit())
         }
         .frame(maxWidth: .infinity)
     }
@@ -66,11 +80,11 @@ struct HighScoresView: View {
                 ForEach(Array(leaderboard.entries.enumerated()), id: \.offset) { rank, entry in
                     row(rank: rank + 1, entry: entry)
                     if rank + 1 < leaderboard.entries.count {
-                        Divider().overlay(.white.opacity(0.15))
+                        Divider()
                     }
                 }
             }
-            .background(.black.opacity(0.2), in: RoundedRectangle(cornerRadius: 12))
+            .background(Palette.bar, in: RoundedRectangle(cornerRadius: 12))
             .padding(.horizontal)
         }
     }
@@ -79,19 +93,17 @@ struct HighScoresView: View {
         HStack {
             Text("\(rank)")
                 .font(.subheadline.monospacedDigit().weight(rank == 1 ? .bold : .regular))
-                .foregroundStyle(.white.opacity(rank == 1 ? 1 : 0.6))
+                .foregroundStyle(rank == 1 ? AnyShapeStyle(.primary) : AnyShapeStyle(.secondary))
                 .frame(width: 28, alignment: .leading)
             Text("\(entry.score)")
                 .font(.title3.monospacedDigit().weight(.semibold))
-                .foregroundStyle(.white)
             Spacer()
             VStack(alignment: .trailing, spacing: 1) {
                 Text(entry.time.clockString)
                     .font(.subheadline.monospacedDigit())
-                    .foregroundStyle(.white)
                 Text(entry.date, format: .dateTime.month(.abbreviated).day().year())
                     .font(.caption2)
-                    .foregroundStyle(.white.opacity(0.6))
+                    .foregroundStyle(.secondary)
             }
         }
         .padding(.horizontal, 14)
@@ -105,18 +117,15 @@ struct HighScoresView: View {
                 .font(.headline)
             Text("Finish a game to claim the top spot.")
                 .font(.subheadline)
-                .foregroundStyle(.white.opacity(0.7))
+                .foregroundStyle(.secondary)
         }
-        .foregroundStyle(.white.opacity(0.85))
+        .foregroundStyle(.secondary)
         .frame(maxWidth: .infinity)
         .padding(.top, 48)
     }
 
     private var feltBackground: some View {
-        LinearGradient(colors: [Color(red: 0.06, green: 0.36, blue: 0.18),
-                                Color(red: 0.03, green: 0.20, blue: 0.10)],
-                       startPoint: .top, endPoint: .bottom)
-            .ignoresSafeArea()
+        Palette.table.ignoresSafeArea()
     }
 }
 

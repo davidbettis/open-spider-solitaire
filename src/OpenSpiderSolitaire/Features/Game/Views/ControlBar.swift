@@ -18,11 +18,8 @@ struct ControlBar: View {
             Spacer()
             Button("Restart") { confirmingRestart = true }
             Spacer()
-            // The system's disabled dimming all but vanishes on the dark felt,
-            // so the unavailable state is drawn explicitly.
             // Undo jumps back; it never plays a move in reverse (spec §7).
             Button("Undo") { Motion.instantly { session.undo() } }
-                .foregroundStyle(.white.opacity(session.canUndo ? 1 : 0.35))
                 .disabled(!session.canUndo)
             Spacer()
             Button("Hint", action: onHint)
@@ -30,9 +27,8 @@ struct ControlBar: View {
         .font(.subheadline.weight(.semibold))
         .lineLimit(1)
         .minimumScaleFactor(0.7)
-        .tint(.white)
         .padding(.horizontal, 24)
         .padding(.vertical, 10)
-        .background(.black.opacity(0.25))
+        .background(Palette.bar)
     }
 }

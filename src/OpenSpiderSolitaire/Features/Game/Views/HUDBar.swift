@@ -35,17 +35,16 @@ struct HUDBar: View {
         }
         .frame(height: HUDLayout.contentHeight * BoardLayout.aspectRatio)
         .font(.subheadline)
-        .foregroundStyle(.white)
+        .foregroundStyle(.primary)
         .padding(.horizontal)
         .padding(.vertical, 8)
-        .background(.black.opacity(0.25))
+        .background(Palette.bar)
     }
 
     private var menuButton: some View {
         Button(action: onExit) {
             Image(systemName: "chevron.left").font(.headline)
         }
-        .tint(.white)
         .accessibilityLabel("Menu")
         .padding(.trailing, 8)
     }
@@ -63,7 +62,7 @@ struct HUDBar: View {
 
     private func stat(_ title: String, _ value: String) -> some View {
         VStack(spacing: 1) {
-            Text(title).font(.caption2).foregroundStyle(.white.opacity(0.7))
+            Text(title).font(.caption2).foregroundStyle(.secondary)
             Text(value).font(.headline.monospacedDigit())
         }
         .fixedSize()

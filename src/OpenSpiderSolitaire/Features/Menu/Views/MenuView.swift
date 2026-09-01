@@ -1,72 +1,93 @@
 import SwiftUI
 
-/// Main menu: suit-mode selection, High Scores, and Reset Scores (PRD Screens
-/// §1). Starting a game hands the chosen mode back to `RootView`, which creates
-/// the session.
+/// Title screen: the logo over the app name, a difficulty picker, and Start
+/// Game, with Settings and High Scores on a bottom toolbar.
+///
+/// Uses system surfaces and the system tint throughout, so it follows the
+/// platform and the user's appearance setting.
 struct MenuView: View {
-    @Environment(HighScoresStore.self) private var highScores
-
     let onStart: (SuitMode) -> Void
     let onHighScores: () -> Void
+    let onSettings: () -> Void
 
-    @State private var confirmingReset = false
+    /// Difficulty is now chosen first and started second, so the mode has to
+    /// live somewhere between the two taps.
+    @State private var mode: SuitMode = .one
 
     var body: some View {
         ZStack {
-            LinearGradient(colors: [Color(red: 0.06, green: 0.36, blue: 0.18),
-                                    Color(red: 0.03, green: 0.20, blue: 0.10)],
-                           startPoint: .top, endPoint: .bottom)
-                .ignoresSafeArea()
+            Palette.screen.ignoresSafeArea()
 
-            VStack(spacing: 28) {
-                VStack(spacing: 6) {
-                    Image(systemName: "suit.spade.fill").font(.system(size: 56))
-                    Text("Spider Solitaire").font(.largeTitle.bold())
-                }
-                .foregroundStyle(.white)
-
-                VStack(spacing: 14) {
-                    Text("Choose difficulty")
-                        .font(.headline)
-                        .foregroundStyle(.white.opacity(0.85))
-                    ForEach(SuitMode.allCases, id: \.self) { mode in
-                        Button { onStart(mode) } label: {
-                            Text(mode.menuTitle)
-                                .fontWeight(.semibold)
-                                .frame(maxWidth: 280)
-                                .padding(.vertical, 4)
-                        }
-                        .buttonStyle(.borderedProminent)
-                        .controlSize(.large)
-                        .tint(.white.opacity(0.9))
-                        .foregroundStyle(.black)
-                    }
-                }
-
-                VStack(spacing: 10) {
-                    Button("High Scores", action: onHighScores)
-                        .buttonStyle(.bordered)
-                        .controlSize(.large)
-                        .tint(.white)
-                    Button("Reset Scores", role: .destructive) { confirmingReset = true }
-                        .buttonStyle(.borderless)
-                        .font(.subheadline)
-                        .tint(.white.opacity(0.75))
-                }
+            VStack(spacing: 30) {
+                header
+                difficulty
+                startButton
             }
             .padding()
         }
-        .confirmationDialog("Reset all high scores?", isPresented: $confirmingReset,
-                            titleVisibility: .visible) {
-            Button("Reset Scores", role: .destructive) { highScores.resetAll() }
-            Button("Cancel", role: .cancel) {}
-        } message: {
-            Text("Every mode's leaderboard and stats are cleared. This cannot be undone.")
+        .toolbar {
+            ToolbarItemGroup(placement: .bottomBar) {
+                // Plain titles: a bottom bar collapses a Label to its icon
+                // whatever label style is asked for, and these want naming.
+                Button("Settings", action: onSettings)
+                Spacer()
+                Button("High Scores", action: onHighScores)
+            }
         }
+    }
+
+    private var header: some View {
+        VStack(spacing: 12) {
+            Image("AppLogo")
+                .resizable()
+                .scaledToFit()
+                .frame(maxHeight: 190)
+                // The name sits right below, so the artwork would only repeat it.
+                .accessibilityHidden(true)
+
+            Text("Open Spider Solitaire")
+                .font(.headline)
+                .foregroundStyle(.primary)
+        }
+    }
+
+    private var difficulty: some View {
+        VStack(spacing: 10) {
+            Text("Choose difficulty")
+                .font(.subheadline)
+                .foregroundStyle(.secondary)
+
+            Picker("Difficulty", selection: $mode) {
+                ForEach(SuitMode.allCases, id: \.self) { mode in
+                    Text(mode.shortName).tag(mode)
+                }
+            }
+            .pickerStyle(.segmented)
+            .frame(maxWidth: 320)
+
+            // The segments only have room for the suit count, so the
+            // difficulty word follows the selection here instead.
+            Text(mode.difficultyName)
+                .font(.footnote.weight(.medium))
+                .foregroundStyle(.secondary)
+                .animation(nil, value: mode)
+        }
+    }
+
+    private var startButton: some View {
+        Button { onStart(mode) } label: {
+            Text("Start Game")
+                .fontWeight(.semibold)
+                .frame(maxWidth: 320)
+                .padding(.vertical, 6)
+        }
+        .buttonStyle(.borderedProminent)
+        .controlSize(.large)
     }
 }
 
 #Preview {
-    MenuView(onStart: { _ in }, onHighScores: {})
-        .environment(HighScoresStore())
+    NavigationStack {
+        MenuView(onStart: { _ in }, onHighScores: {}, onSettings: {})
+    }
 }

@@ -13,10 +13,9 @@ struct FinishGameButton: View {
                 .padding(.horizontal, 22)
                 .padding(.vertical, 12)
         }
-        .buttonStyle(.plain)
-        .foregroundStyle(.black)
-        .background(Capsule().fill(.yellow))
-        .shadow(color: .black.opacity(0.35), radius: 8, y: 3)
+        .buttonStyle(.borderedProminent)
+        .controlSize(.large)
+        .shadow(color: .black.opacity(0.25), radius: 8, y: 3)
         .accessibilityHint("Finishes the game automatically at no point cost")
     }
 }

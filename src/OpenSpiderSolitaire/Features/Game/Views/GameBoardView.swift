@@ -278,16 +278,16 @@ struct GameBoardView: View {
                 }
             }
             .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .top)
+            // The same colour the columns paint, so the gutters between them
+            // read as part of one field rather than as gaps.
+            .background(Palette.columnStrip)
             .coordinateSpace(.named("board"))
             .onPreferenceChange(ColumnFramesKey.self) { interaction.columnFrames = $0 }
         }
     }
 
     private var feltBackground: some View {
-        LinearGradient(colors: [Color(red: 0.06, green: 0.36, blue: 0.18),
-                                Color(red: 0.03, green: 0.24, blue: 0.12)],
-                       startPoint: .top, endPoint: .bottom)
-            .ignoresSafeArea()
+        Palette.table.ignoresSafeArea()
     }
 }
 

@@ -21,7 +21,7 @@ struct ColumnView: View {
     var body: some View {
         ZStack(alignment: .top) {
             RoundedRectangle(cornerRadius: layout.cardSize.width * 0.12)
-                .fill(.white.opacity(0.06))
+                .fill(Palette.columnStrip)
                 .frame(width: layout.cardSize.width, height: regionHeight)
 
             ForEach(Array(cards.enumerated()), id: \.element.id) { position, card in

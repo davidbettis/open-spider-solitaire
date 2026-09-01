@@ -53,7 +53,7 @@ struct CardOutline: View {
 
     var body: some View {
         RoundedRectangle(cornerRadius: size.width * 0.12)
-            .strokeBorder(.white.opacity(0.35), style: StrokeStyle(lineWidth: 1, dash: [3, 2]))
+            .strokeBorder(Palette.placeholder, style: StrokeStyle(lineWidth: 1, dash: [3, 2]))
             .frame(width: size.width, height: size.height)
     }
 }

@@ -48,11 +48,13 @@ struct RootView: View {
             } else {
                 NavigationStack(path: $path) {
                     MenuView(onStart: startGame,
-                             onHighScores: { path.append(.highScores) })
+                             onHighScores: { path.append(.highScores) },
+                             onSettings: { path.append(.settings) })
                         .navigationDestination(for: Route.self) { route in
                             switch route {
                             case .highScores: HighScoresView()
-                            case .game, .settings: EmptyView()
+                            case .settings: SettingsView()
+                            case .game: EmptyView()
                             }
                         }
                 }

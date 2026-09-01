@@ -68,27 +68,50 @@ struct CardFace: View {
         RoundedRectangle(cornerRadius: cornerRadius)
             .fill(.white)
             .overlay(RoundedRectangle(cornerRadius: cornerRadius).strokeBorder(.black.opacity(0.25), lineWidth: 0.5))
-            .overlay(alignment: .topLeading) { corner.padding(size.width * 0.08) }
+            .overlay(alignment: .top) { index }
+            // Decoration for the exposed card only: a covered card never shows
+            // it. Nudged below the card's centre, because the index occupies
+            // the top and a truly centred pip leaves the face top-heavy. Half
+            // of the way to centring it in the space below the index, which
+            // overcorrects and reads bottom-heavy instead.
             .overlay {
                 Image(systemName: card.suit.symbolName)
                     .font(.system(size: size.width * 0.42))
                     .foregroundStyle(card.suit.tint)
+                    .offset(y: CardFace.indexExtent(size) / 4)
             }
             .frame(width: size.width, height: size.height)
     }
 
     private var cornerRadius: CGFloat { size.width * 0.12 }
 
-    private var corner: some View {
-        VStack(spacing: -size.width * 0.02) {
+    /// How far down the card the index reaches: top padding plus its tallest
+    /// row. The centre pip is balanced against this.
+    static func indexExtent(_ size: CGSize) -> CGFloat { size.width * 0.44 }
+
+    /// Rank and suit on one line, and the card's *only* index: rank against the
+    /// left edge, pip against the right.
+    ///
+    /// One line, not stacked, because of how little of a covered card shows.
+    /// `BoardLayout.faceUpPeek` reveals `cardHeight * 0.34` of each card under
+    /// another, which at `aspectRatio` 1.4 is `0.476 * cardWidth`. A stacked
+    /// rank-over-pip index is about `0.71 * cardWidth` tall, so the pip fell
+    /// below the fold and every covered card showed a bare rank - unreadable in
+    /// 2- and 4-suit, where colour alone does not identify a suit. On one line
+    /// the index is `indexExtent` tall and fits inside the peek.
+    private var index: some View {
+        HStack(spacing: 0) {
             Text(rankText)
-                .font(.system(size: size.width * 0.34, weight: .bold, design: .rounded))
+                .font(.system(size: size.width * 0.30, weight: .bold, design: .rounded))
+            Spacer(minLength: size.width * 0.04)
             Image(systemName: card.suit.symbolName)
-                .font(.system(size: size.width * 0.20))
+                .font(.system(size: size.width * 0.22))
         }
         .foregroundStyle(card.suit.tint)
         .lineLimit(1)
         .minimumScaleFactor(0.5)
+        .padding(.horizontal, size.width * 0.08)
+        .padding(.top, size.width * 0.08)
     }
 
     private var rankText: String {

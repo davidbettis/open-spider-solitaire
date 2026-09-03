@@ -33,6 +33,8 @@ struct MenuView: View {
                 // The name sits right below, so the artwork would only repeat it.
                 .accessibilityHidden(true)
 
+            // The product name in full. Only the home-screen label is
+            // shortened, and that is set in project.yml, not here.
             Text("Open Spider Solitaire")
                 .font(.headline)
                 .foregroundStyle(.primary)

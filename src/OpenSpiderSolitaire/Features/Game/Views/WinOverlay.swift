@@ -11,17 +11,21 @@ struct WinOverlay: View {
     let summary: WinSummary?
     let onExit: () -> Void
 
+    @Environment(\.chrome) private var chrome
+
     var body: some View {
         ZStack {
-            VStack(spacing: 16) {
+            VStack(spacing: 16 * chrome.scale) {
+                // Already the top of the ladder, so it is the one label that
+                // does not step up on iPad — as a system alert's title doesn't.
                 Text("You Win!").font(.largeTitle.bold())
                 Text("Score \(session.displayScore)  ·  \(session.elapsed.clockString)")
-                    .font(.headline.monospacedDigit())
+                    .font(chrome.pick(phone: Font.headline, pad: Font.title2).monospacedDigit())
                     .foregroundStyle(.secondary)
 
                 if let summary { records(summary) }
 
-                HStack(spacing: 12) {
+                HStack(spacing: 12 * chrome.scale) {
                     Button("New Game") {
                         Motion.instantly {
                             var rng = SystemRandomNumberGenerator()
@@ -32,10 +36,12 @@ struct WinOverlay: View {
                     Button("Menu", action: onExit)
                         .buttonStyle(.bordered)
                 }
+                .font(chrome.pick(phone: .body, pad: .title3))
+                .controlSize(chrome.pick(phone: .regular, pad: .large))
                 .padding(.top, 4)
             }
-            .padding(32)
-            .background(.regularMaterial, in: RoundedRectangle(cornerRadius: 20))
+            .padding(32 * chrome.scale)
+            .background(.regularMaterial, in: RoundedRectangle(cornerRadius: 20 * chrome.scale))
             .padding(40)
         }
     }

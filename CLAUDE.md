@@ -5,8 +5,8 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 # Project: OpenSpiderSolitaire
 
 ## Quick Reference
-- **Platform**: iOS 17+ — iPhone is the shipping target (`TARGETED_DEVICE_FAMILY = 1`); iPad is planned for a later version
-- **Orientation**: portrait and landscape (no upside-down while iPhone-only)
+- **Platform**: iOS 17+ — universal, iPhone + iPad (`TARGETED_DEVICE_FAMILY = "1,2"`)
+- **Orientation**: iPhone portrait + landscape; iPad all four (required for a universal bundle)
 - **Language**: Swift 6.0
 - **UI Framework**: SwiftUI
 - **Architecture**: MVVM with @Observable
@@ -92,46 +92,64 @@ enum AppError: LocalizedError {
 - Use Swift Testing framework (@Test, #expect)
 - Minimum 80% code coverage for business logic
 
-## Device Support: iPhone Now, iPad Later
-**iPhone is the primary and only shipping target** (`TARGETED_DEVICE_FAMILY = 1`).
-**iPad is a planned secondary target, deferred to a later version** — it is not cut,
-just not built yet.
+## Device Support: Universal (iPhone + iPad)
 
-Until that version is scheduled:
-- Build and verify for iPhone. The board UI is designed and verified at iPhone sizes;
-  there is no iPad design to build against yet, so an iPad build would ship a stretched
-  iPhone layout.
-- Do not add iPad layouts, `~ipad` Info.plist keys, or iPad-only APIs (Slide Over,
-  Stage Manager, pointer/hover) ahead of that work.
-- **Do** keep new UI layout-driven rather than hardcoded to iPhone geometry — prefer
-  size classes and the existing `BoardLayout` / `HUDLayout` sizing math over magic
-  numbers, so the later iPad pass is a layout problem and not a rewrite.
+The app ships **universal** (`TARGETED_DEVICE_FAMILY = "1,2"`). iPhone remains the
+design baseline; iPad is the same app scaled, not a second layout.
 
-### What flipping on iPad will require
-1. Set `TARGETED_DEVICE_FAMILY: "1,2"` on **each target's** `settings.base` in
-   `project.yml` (see the trap below), then `xcodegen generate`.
-2. Add the fourth orientation: a universal build is **rejected at App Store validation**
-   unless `UISupportedInterfaceOrientations` lists all four, including
-   `UIInterfaceOrientationPortraitUpsideDown`, for iPad multitasking. The current list
-   is portrait + both landscapes, which is valid only while the app is iPhone-only.
-3. Design an actual iPad board layout before enabling any of the above.
+**Setting the device family is a trap.** XcodeGen writes its own defaults at the
+*target* level, and those override the project-level `settings.base`. So
+`TARGETED_DEVICE_FAMILY` is declared on **each target's** `settings.base` even
+though the value now happens to match XcodeGen's default — it stays spelled out
+so it is a decision and not a coincidence of whatever XcodeGen defaults to next.
+(This was first hit in the other direction: `"1"` set only at the project level
+was silently overridden with `"1,2"` and the app shipped universal by accident,
+which App Store validation rejected.) After changing it, verify the built
+product, not the YAML:
+`plutil -p <built .app>/Info.plist | grep -A3 UIDeviceFamily`.
 
-**Setting the device family is a trap.** XcodeGen writes its own defaults at the *target*
-level, and those override the project-level `settings.base`. `TARGETED_DEVICE_FAMILY`
-must therefore be declared on **each target's** `settings.base` — set only at the project
-level, it is silently overridden with `"1,2"` and the app ships as universal by accident
-(this is exactly how the App Store validation rejection above was first hit). After
-changing it, verify the built product, not the YAML:
-`plutil -p <built .app>/Info.plist | grep -A2 UIDeviceFamily`.
+**Orientations are per idiom, and iPad's list must be exhaustive.** A universal
+bundle is **rejected at App Store validation** unless iPad supports all four,
+including `UIInterfaceOrientationPortraitUpsideDown`, for multitasking. So
+`project.yml` sets `INFOPLIST_KEY_UISupportedInterfaceOrientations_iPhone`
+(portrait + both landscapes) and `..._iPad` (all four), and deliberately does
+**not** set the generic `INFOPLIST_KEY_UISupportedInterfaceOrientations`.
 
-(An inert `AppIcon76x76@2x~ipad.png` / `CFBundleIcons~ipad` already appears in the bundle;
-that comes from the modern single-size `"universal"` app icon and is harmless — device
-support is determined by `UIDeviceFamily`, not icon idioms.)
+### How the two idioms differ
+There is no iPad-specific screen, and nothing is gated on `UIDevice`. Two knobs
+carry the whole difference, both driven by **size classes** and both applied only
+when the container is `.regular` in *both* axes:
+
+- **`Core/Layout/Chrome.swift`** — injected into the environment once, in
+  `RootView`, and read by the bars and the menu/settings/high-score screens. It
+  multiplies the iPhone-tuned point metrics (`chrome.scale`) and picks the larger
+  text style (`chrome.pick(phone:pad:)`). The board needed none of this:
+  `BoardLayout` already derives every card from its container.
+- **`BoardLayout.Spread`** — `.roomy` fans the tableau further down the column so
+  the board is not stranded in a band across the top of an iPad. See
+  `docs/specs/game-board-ui.md` §5 for why it is measured against a fixed nominal
+  column rather than the live board.
+
+Why size classes and not width: an iPhone 17 Pro Max in landscape is 956pt wide,
+wider than an iPad mini in portrait at 744pt, but only 440pt tall — width alone
+cannot tell the idioms apart, and the pair can. It also means an iPad in Slide
+Over, in a narrow Split View pane, or in a small iPadOS 26 window correctly gets
+the compact design; a pane is regular only from roughly 639pt.
+
+**Keep new UI layout-driven.** Prefer size classes and the existing
+`BoardLayout` / `HUDLayout` / `Chrome` math over magic numbers; a point value
+that was measured against an iPhone belongs in `Chrome` as `base * chrome.scale`,
+not inline.
+
+**Verifying iPad layouts.** The simulator cannot be rotated from this environment
+(no assistive access for `osascript`, and `simctl` has no rotate). Landscape was
+checked by temporarily rendering the root view into a fixed 1366×1024 frame,
+scaled to fit a portrait simulator — see `simulator-verification` in memory for
+that pattern and how to revert it.
 
 ## macOS Support
-While the app is iPhone-only it runs on Apple Silicon Macs as **"Designed for iPhone"**
-(not Mac Catalyst or native macOS). It will present as "Designed for iPad" once the iPad
-target above is enabled; either way, the rules are the same:
+Now that the app is universal it runs on Apple Silicon Macs as **"Designed for
+iPad"** (not Mac Catalyst or native macOS). The rules are unchanged:
 - `#if os(macOS)` is **always false** — do NOT use it for Mac-specific behavior
 - Use `ProcessInfo.processInfo.isiOSAppOnMac` for runtime Mac detection instead
 - UIKit types like `UIImage` are available on Mac (no need for `#if canImport(UIKit)` guards)

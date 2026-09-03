@@ -7,6 +7,7 @@ struct GameBoardView: View {
     @Environment(GameSession.self) private var session
     @Environment(HighScoresStore.self) private var highScores
     @Environment(\.scenePhase) private var scenePhase
+    @Environment(\.chrome) private var chrome
 
     /// Matches each card by `Card.id` as it moves between columns (spec §5.1).
     @Namespace private var cardNamespace
@@ -156,9 +157,10 @@ struct GameBoardView: View {
     }
 
     /// The cascade draws at roughly a tableau card's size, without needing the
-    /// tableau's own layout.
+    /// tableau's own layout — so it takes the chrome's scale rather than the
+    /// board's, which is enough to keep it in proportion on either idiom.
     private var cascadeCardSize: CGSize {
-        let width: CGFloat = 58
+        let width: CGFloat = 58 * chrome.scale
         return CGSize(width: width, height: width * BoardLayout.aspectRatio)
     }
 
@@ -252,7 +254,9 @@ struct GameBoardView: View {
 
     private var tableauArea: some View {
         GeometryReader { proxy in
-            let layout = BoardLayout(size: proxy.size, tableau: session.state.board.tableau)
+            let layout = BoardLayout(size: proxy.size,
+                                     tableau: session.state.board.tableau,
+                                     spread: chrome.pick(phone: .compact, pad: .roomy))
             ZStack(alignment: .top) {
                 TableauView(tableau: visibleTableau,
                             layout: layout,

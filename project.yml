@@ -16,10 +16,13 @@ settings:
   base:
     SWIFT_VERSION: "6.0"
     SWIFT_STRICT_CONCURRENCY: complete
-    # iPhone only (PRD "Platform & Scope"). This has to be repeated on every
-    # target below: XcodeGen's iOS setting presets write "1,2" at the *target*
-    # level, which beats anything set here at the project level.
-    TARGETED_DEVICE_FAMILY: "1"
+    # Universal: iPhone + iPad (PRD "Platform & Scope"). This has to be
+    # repeated on every target below - XcodeGen's iOS setting presets write
+    # TARGETED_DEVICE_FAMILY at the *target* level, which beats anything set
+    # here at the project level. It happens to agree with the preset's default
+    # today; it stays spelled out so the value is a decision and not a
+    # coincidence of whatever XcodeGen defaults to next.
+    TARGETED_DEVICE_FAMILY: "1,2"
     # DEVELOPMENT_TEAM is deliberately NOT set here: it is personal, and this
     # repo is public. It comes from Config/Signing.xcconfig, which optionally
     # includes the gitignored Config/Signing.local.xcconfig. See that file.
@@ -35,7 +38,7 @@ targets:
     settings:
       base:
         PRODUCT_BUNDLE_IDENTIFIER: com.openspidersolitaire.OpenSpiderSolitaire
-        TARGETED_DEVICE_FAMILY: "1"
+        TARGETED_DEVICE_FAMILY: "1,2"
         GENERATE_INFOPLIST_FILE: YES
         ASSETCATALOG_COMPILER_APPICON_NAME: AppIcon
         ASSETCATALOG_COMPILER_GLOBAL_ACCENT_COLOR_NAME: AccentColor
@@ -64,9 +67,20 @@ targets:
         INFOPLIST_KEY_LSApplicationCategoryType: public.app-category.card-games
         MARKETING_VERSION: "1.0.0"       # General tab → Version
         CURRENT_PROJECT_VERSION: "1.0.0" # General tab → Build
-        # Both orientations (PRD), iPhone
-        INFOPLIST_KEY_UISupportedInterfaceOrientations: >-
+        # Per idiom, deliberately NOT the generic
+        # INFOPLIST_KEY_UISupportedInterfaceOrientations: iPhone and iPad want
+        # different lists. iPhone gets portrait + both landscapes (PRD); the
+        # phone is never held upside-down for a card game and the notch/Dynamic
+        # Island makes it look broken. iPad must list all four - App Store
+        # validation rejects a universal bundle whose iPad orientations are not
+        # exhaustive, because multitasking can hand the app any of them.
+        INFOPLIST_KEY_UISupportedInterfaceOrientations_iPhone: >-
           UIInterfaceOrientationPortrait
+          UIInterfaceOrientationLandscapeLeft
+          UIInterfaceOrientationLandscapeRight
+        INFOPLIST_KEY_UISupportedInterfaceOrientations_iPad: >-
+          UIInterfaceOrientationPortrait
+          UIInterfaceOrientationPortraitUpsideDown
           UIInterfaceOrientationLandscapeLeft
           UIInterfaceOrientationLandscapeRight
 
@@ -80,7 +94,7 @@ targets:
     settings:
       base:
         PRODUCT_BUNDLE_IDENTIFIER: com.openspidersolitaire.OpenSpiderSolitaireTests
-        TARGETED_DEVICE_FAMILY: "1"      # match the host app
+        TARGETED_DEVICE_FAMILY: "1,2"    # match the host app
         GENERATE_INFOPLIST_FILE: YES
 
 schemes:

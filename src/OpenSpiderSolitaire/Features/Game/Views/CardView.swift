@@ -11,9 +11,11 @@ import SwiftUI
 struct CardView: View {
     let card: Card
     let size: CGSize
+    /// Whether a card is fanned on top of this one; see ``CardFace``.
+    var isCovered = false
 
     var body: some View {
-        FlippingCard(angle: card.isFaceUp ? 0 : 180, card: card, size: size)
+        FlippingCard(angle: card.isFaceUp ? 0 : 180, card: card, size: size, isCovered: isCovered)
             .frame(width: size.width, height: size.height)
             .animation(Motion.flip, value: card.isFaceUp)
     }

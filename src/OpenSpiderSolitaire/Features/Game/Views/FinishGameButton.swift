@@ -6,12 +6,14 @@ import SwiftUI
 struct FinishGameButton: View {
     let action: () -> Void
 
+    @Environment(\.chrome) private var chrome
+
     var body: some View {
         Button(action: action) {
             Label("Finish Game", systemImage: "wand.and.stars")
-                .font(.headline)
-                .padding(.horizontal, 22)
-                .padding(.vertical, 12)
+                .font(chrome.pick(phone: .headline, pad: .title2))
+                .padding(.horizontal, 22 * chrome.scale)
+                .padding(.vertical, 12 * chrome.scale)
         }
         .buttonStyle(.borderedProminent)
         .controlSize(.large)

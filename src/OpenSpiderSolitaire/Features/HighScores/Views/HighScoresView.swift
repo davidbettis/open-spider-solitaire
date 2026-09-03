@@ -4,6 +4,7 @@ import SwiftUI
 /// (spec §9). Rows show the score and the time from that same game.
 struct HighScoresView: View {
     @Environment(HighScoresStore.self) private var store
+    @Environment(\.chrome) private var chrome
 
     @State private var mode: SuitMode = .one
     @State private var confirmingReset = false
@@ -31,6 +32,10 @@ struct HighScoresView: View {
                 Spacer(minLength: 0)
             }
             .padding(.top, 12)
+            // A ten-row table stretched over an iPad's width leaves the rank
+            // and the time at opposite edges with a field of nothing between.
+            .frame(maxWidth: chrome.pick(phone: .infinity, pad: 700))
+            .frame(maxWidth: .infinity)
         }
         .navigationTitle("High Scores")
         .navigationBarTitleDisplayMode(.inline)

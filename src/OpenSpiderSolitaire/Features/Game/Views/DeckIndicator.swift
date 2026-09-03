@@ -50,13 +50,16 @@ struct DeckIndicator: View {
         Card(id: card.id, rank: card.rank, suit: card.suit, isFaceUp: false)
     }
 
+    /// Sized from the deck card rather than in fixed points, so it stays the
+    /// same badge on a phone's slot and an iPad's.
     private var badge: some View {
         Text("\(dealsRemaining)")
-            .font(.caption2.bold().monospacedDigit())
+            .font(.system(size: layout.slotSize.width * 0.34,
+                          weight: .bold, design: .rounded).monospacedDigit())
             .foregroundStyle(.white)
-            .padding(.horizontal, 4)
+            .padding(.horizontal, layout.slotSize.width * 0.12)
             .background(Capsule().fill(.black.opacity(0.7)))
             .overlay(Capsule().strokeBorder(.white.opacity(0.45), lineWidth: 0.5))
-            .offset(x: 3, y: 3)
+            .offset(x: layout.slotSize.width * 0.09, y: layout.slotSize.width * 0.09)
     }
 }

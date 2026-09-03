@@ -10,7 +10,8 @@ struct DragLayer: View {
         let stackHeight = layout.cardSize.height + CGFloat(drag.cards.count - 1) * layout.faceUpPeek
         ZStack(alignment: .top) {
             ForEach(Array(drag.cards.enumerated()), id: \.element.id) { position, card in
-                CardView(card: card, size: layout.cardSize)
+                CardView(card: card, size: layout.cardSize,
+                         isCovered: position < drag.cards.count - 1)
                     .offset(y: CGFloat(position) * layout.faceUpPeek)
                     .zIndex(Double(position))
             }

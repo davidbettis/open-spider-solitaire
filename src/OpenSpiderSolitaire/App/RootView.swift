@@ -11,6 +11,9 @@ enum Route: Hashable {
 /// The active `GameSession` is created here and injected into the environment
 /// (spec: `GameBoardView` reads `@Environment(GameSession.self)`).
 struct RootView: View {
+    @Environment(\.horizontalSizeClass) private var horizontalSizeClass
+    @Environment(\.verticalSizeClass) private var verticalSizeClass
+
     @State private var game: GameSession?
     @State private var highScores: HighScoresStore
     @State private var settings: SettingsStore
@@ -68,6 +71,11 @@ struct RootView: View {
         // Applied at the root so it covers the board, the menu, and everything
         // pushed on top of them. `nil` for .system means "do not override".
         .preferredColorScheme(settings.appearance.colorScheme)
+        // Derived once, here, so every bar and screen below agrees on how much
+        // room it is playing with — and so it follows the *window*, which on
+        // iPad changes with multitasking, not the device it is installed on.
+        .environment(\.chrome, Chrome(horizontal: horizontalSizeClass,
+                                      vertical: verticalSizeClass))
     }
 
     /// Difficulty comes from Settings, not from the caller: the title screen no

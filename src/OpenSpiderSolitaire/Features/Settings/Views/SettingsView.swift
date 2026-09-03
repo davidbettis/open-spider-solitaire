@@ -6,6 +6,7 @@ import SwiftUI
 /// so there is no Save button and nothing to discard.
 struct SettingsView: View {
     @Environment(SettingsStore.self) private var store
+    @Environment(\.chrome) private var chrome
 
     var body: some View {
         @Bindable var store = store
@@ -38,6 +39,11 @@ struct SettingsView: View {
                 Text("System follows your device's light or dark setting.")
             }
         }
+        // Matches the high-score table: full-width rows holding one picker
+        // each read as a very empty form on an iPad.
+        .frame(maxWidth: chrome.pick(phone: .infinity, pad: 700))
+        .frame(maxWidth: .infinity)
+        .background(Palette.table)
         .navigationTitle("Settings")
         .navigationBarTitleDisplayMode(.inline)
     }

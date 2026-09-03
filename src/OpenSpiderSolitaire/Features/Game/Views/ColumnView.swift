@@ -62,7 +62,8 @@ struct ColumnView: View {
 
     private func cardView(_ card: Card, at position: Int) -> some View {
         let isDragging = interaction.drag.map { $0.sourceColumn == index && position >= $0.sourceIndex } ?? false
-        return CardView(card: card, size: layout.cardSize)
+        return CardView(card: card, size: layout.cardSize,
+                        isCovered: position < cards.count - 1)
             .matchedGeometryEffect(id: card.id, in: cardNamespace)
             .transaction { transaction in
                 guard justDealtIDs.contains(card.id) else { return }

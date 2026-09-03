@@ -65,7 +65,8 @@ struct HintLayer: View {
         let height = layout.cardSize.height + CGFloat(run.count - 1) * layout.faceUpPeek
         return ZStack(alignment: .top) {
             ForEach(Array(run.enumerated()), id: \.element.id) { position, card in
-                CardView(card: card, size: layout.cardSize)
+                CardView(card: card, size: layout.cardSize,
+                         isCovered: position < run.count - 1)
                     .offset(y: CGFloat(position) * layout.faceUpPeek)
                     .zIndex(Double(position))
             }

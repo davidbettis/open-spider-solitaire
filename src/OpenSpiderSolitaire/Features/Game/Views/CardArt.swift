@@ -53,7 +53,12 @@ struct CardOutline: View {
 
     var body: some View {
         RoundedRectangle(cornerRadius: size.width * 0.12)
-            .strokeBorder(Palette.placeholder, style: StrokeStyle(lineWidth: 1, dash: [3, 2]))
+            // Proportional, like the rest of the ornament here: a hairline dash
+            // tuned against a 32pt HUD slot all but disappears on an iPad's.
+            // At phone sizes this still rounds to the 1pt / [3, 2] it was.
+            .strokeBorder(Palette.placeholder,
+                          style: StrokeStyle(lineWidth: max(1, size.width * 0.03),
+                                             dash: [size.width * 0.09, size.width * 0.06]))
             .frame(width: size.width, height: size.height)
     }
 }
@@ -63,24 +68,36 @@ struct CardOutline: View {
 struct CardFace: View {
     let card: Card
     let size: CGSize
+    /// Whether another card lies on top of this one. Only the centre pip cares.
+    var isCovered = false
 
     var body: some View {
         RoundedRectangle(cornerRadius: cornerRadius)
             .fill(.white)
             .overlay(RoundedRectangle(cornerRadius: cornerRadius).strokeBorder(.black.opacity(0.25), lineWidth: 0.5))
             .overlay(alignment: .top) { index }
-            // Decoration for the exposed card only: a covered card never shows
-            // it. Nudged below the card's centre, because the index occupies
-            // the top and a truly centred pip leaves the face top-heavy. Half
-            // of the way to centring it in the space below the index, which
-            // overcorrects and reads bottom-heavy instead.
-            .overlay {
-                Image(systemName: card.suit.symbolName)
-                    .font(.system(size: size.width * 0.42))
-                    .foregroundStyle(card.suit.tint)
-                    .offset(y: CardFace.indexExtent(size) / 4)
-            }
+            .overlay { centrePip }
             .frame(width: size.width, height: size.height)
+    }
+
+    /// Decoration for the exposed card only. Nudged below the card's centre,
+    /// because the index occupies the top and a truly centred pip leaves the
+    /// face top-heavy. Half of the way to centring it in the space below the
+    /// index, which overcorrects and reads bottom-heavy instead.
+    ///
+    /// It is dropped from covered cards rather than left to be hidden by the
+    /// card above, which is what used to hide it: at the phone's fan a covered
+    /// card shows its top third and the pip is out of sight either way, but
+    /// ``BoardLayout.Spread/roomy`` fans far enough down an iPad's column to
+    /// slice through it, leaving every covered card wearing half a pip.
+    @ViewBuilder
+    private var centrePip: some View {
+        if !isCovered {
+            Image(systemName: card.suit.symbolName)
+                .font(.system(size: size.width * 0.42))
+                .foregroundStyle(card.suit.tint)
+                .offset(y: CardFace.indexExtent(size) / 4)
+        }
     }
 
     private var cornerRadius: CGFloat { size.width * 0.12 }
@@ -134,6 +151,7 @@ struct FlippingCard: View, Animatable {
     var angle: Double
     let card: Card
     let size: CGSize
+    var isCovered = false
 
     // SwiftUI interpolates this off the main actor; reading a stored property
     // of a value type there is safe, so the conformance is nonisolated.
@@ -145,7 +163,7 @@ struct FlippingCard: View, Animatable {
     var body: some View {
         Group {
             if angle < 90 {
-                CardFace(card: card, size: size)
+                CardFace(card: card, size: size, isCovered: isCovered)
             } else {
                 // Counter-rotate so the back is not seen mirrored.
                 CardBack(size: size).rotation3DEffect(.degrees(180), axis: (x: 0, y: 1, z: 0))

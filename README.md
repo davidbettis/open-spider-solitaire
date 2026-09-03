@@ -1,6 +1,6 @@
 # Open Spider Solitaire
 
-A Spider Solitaire game for iPhone that works entirely offline.
+A Spider Solitaire game for iPhone and iPad that works entirely offline.
 
 ## Principles
 
@@ -19,6 +19,11 @@ A Spider Solitaire game for iPhone that works entirely offline.
 - **Resume.** Quit mid-game and the board, score, and clock come back exactly as you left them.
 - **High scores** per difficulty, ranked by score and then by time, with a time to beat.
 - **Light and dark**, following your device or forced either way in Settings.
+- **iPhone and iPad**, in portrait and landscape. There is no separate iPad
+  screen: the board is sized from the space it is given, and on an iPad the
+  cards, the bars, and the fan down each column all scale up with it. That
+  follows the *window*, so an iPad in Split View or a small window gets the
+  compact layout rather than the device's.
 
 ## Game rules
 
@@ -38,8 +43,8 @@ a solver so every one is solvable is planned but not yet built.
 
 ## Requirements
 
-- iPhone running iOS 17 or later.
-- Also runs on Apple Silicon Macs as "Designed for iPhone". There is no iPad layout yet.
+- iPhone or iPad running iOS 17 or later.
+- Also runs on Apple Silicon Macs as "Designed for iPad".
 
 ## Building
 

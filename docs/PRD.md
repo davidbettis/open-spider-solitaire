@@ -2,7 +2,7 @@
 
 ## Overview
 
-A native iOS (iPhone-only) Spider Solitaire game with configurable difficulty (1, 2, or 4 suits), scoring, move undo, timing, and persistent high scores. Fully offline: no ads, no in-app purchases, no network calls, no accounts.
+A native iOS (iPhone and iPad) Spider Solitaire game with configurable difficulty (1, 2, or 4 suits), scoring, move undo, timing, and persistent high scores. Fully offline: no ads, no in-app purchases, no network calls, no accounts.
 
 ## Game Rules
 
@@ -115,7 +115,7 @@ Persisted locally, tracked **separately per suit mode**, as a **top-N leaderboar
 ## Visual Assets
 
 - **Card faces/backs:** an identity, open-source, public-domain SVG deck. *Action item: select and vet a specific public-domain SVG deck; confirm license (e.g., CC0) and record attribution if any.*
-- **Format:** vector (SVG), scaling cleanly across all iPhone sizes.
+- **Format:** vector (SVG), scaling cleanly across all iPhone and iPad sizes.
 - **Card back:** single fixed design.
 - **No theming** at launch (no light/dark variants; fixed table/felt and accent colors).
 - **1-suit color:** no visual aid to distinguish sequences; all one color as normal.
@@ -142,9 +142,18 @@ None at launch: no VoiceOver support, no Dynamic Type scaling, no colorblind aid
 
 ## Platform & Scope
 
-- **iPhone only** (not universal; no iPad layout).
-- **Orientation:** both portrait and landscape.
-- **Device range:** all current iPhone sizes.
+- **Universal: iPhone and iPad.**
+- **Orientation:** portrait and landscape on iPhone; all four on iPad, which App
+  Store validation requires of a universal app so multitasking can hand it any
+  of them.
+- **Device range:** all current iPhone and iPad sizes, including iPad
+  multitasking and iPadOS windowing, where the app may be given any window size.
+- **One layout, two scales.** There is no separate iPad screen. The board is
+  derived from its container and already scaled; the chrome around it — the HUD,
+  the control bar, the title screen — is the iPhone design multiplied, and the
+  tableau fans further down the column when there is room to. Both follow the
+  **size classes**, so an iPad in a narrow Split View pane or a small window
+  correctly gets the compact design rather than the device's.
 - **Minimum iOS:** 17+.
 - **App name, icon, App Store metadata:** placeholders for now.
 

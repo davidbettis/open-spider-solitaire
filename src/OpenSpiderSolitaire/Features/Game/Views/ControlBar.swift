@@ -10,6 +10,8 @@ struct ControlBar: View {
     @Binding var confirmingRestart: Bool
     let onHint: () -> Void
 
+    @Environment(\.chrome) private var chrome
+
     var body: some View {
         HStack {
             // The destructive role lives on the dialog's confirm button, so
@@ -24,11 +26,16 @@ struct ControlBar: View {
             Spacer()
             Button("Hint", action: onHint)
         }
-        .font(.subheadline.weight(.semibold))
+        .font(chrome.pick(phone: Font.subheadline, pad: Font.title3).weight(.semibold))
         .lineLimit(1)
         .minimumScaleFactor(0.7)
-        .padding(.horizontal, 24)
-        .padding(.vertical, 10)
+        .padding(.horizontal, 24 * chrome.scale)
+        .padding(.vertical, 10 * chrome.scale)
+        // Four buttons spread over an iPad's full width land nowhere near each
+        // other; capped, they stay a group of controls. The bar's background
+        // still runs edge to edge.
+        .frame(maxWidth: chrome.pick(phone: .infinity, pad: 760))
+        .frame(maxWidth: .infinity)
         .background(Palette.bar)
     }
 }

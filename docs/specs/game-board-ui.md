@@ -4,7 +4,7 @@
 - **Owner:** TBD
 - **Source PRD:** [`docs/PRD.md`](../PRD.md)
 - **Spec sequence:** #2. Depends on [`game-engine`](./game-engine.md). Peers: [`animations`](./animations.md), [`hints-and-autocomplete`](./hints-and-autocomplete.md).
-- **Target:** SwiftUI, iOS 17+, iPhone only, portrait + landscape.
+- **Target:** SwiftUI, iOS 17+, universal (iPhone + iPad), portrait + landscape.
 
 ---
 
@@ -15,7 +15,7 @@ The Game Board UI renders the live game — the 10-column tableau, the stock, th
 ## 2. Goals / Non-Goals
 
 **Goals**
-- Responsive layout for all current iPhone sizes in both orientations, including columns that grow very tall.
+- Responsive layout for all current iPhone and iPad sizes in every orientation — and for any window an iPad's multitasking or windowing hands the app — including columns that grow very tall.
 - Single-tap auto-move and drag-and-drop with explicit destination control, disambiguated cleanly.
 - HUD: floored live score, live MM:SS timer, deals-remaining stock indicator.
 - Controls: undo, hint, new-game (with in-progress confirmation).
@@ -35,7 +35,7 @@ The Game Board UI renders the live game — the 10-column tableau, the stock, th
 - **US-2** — As a player, tapping a movable card sends it to the best legal spot automatically.
 - **US-3** — As a player, I can drag a card or run to a specific column when I want to choose the destination.
 - **US-4** — As a player, invalid moves simply don't happen — no error, no buzz.
-- **US-5** — As a player, the board looks right on my iPhone in portrait and landscape, even when a column gets long.
+- **US-5** — As a player, the board looks right on my iPhone or iPad in portrait and landscape, even when a column gets long.
 - **US-6** — As a player, starting a new game mid-play asks me to confirm.
 - **US-7** — As a player, the timer pauses when I open a menu or leave the app.
 
@@ -78,6 +78,8 @@ Rules:
 - **Fanning:** face-down cards use a small `faceDownPeek`; face-up cards a larger `faceUpPeek` so rank+suit corners stay visible.
 - **Vertical fit (no scroll):** compute each column's natural height; if the tallest exceeds available tableau height, apply a single global **peek compression factor** so the longest column fits. Peeks have hard minimums; if even minimum peeks overflow (pathological long column in landscape), the tableau region — and only that region — becomes vertically scrollable as a fallback. Prefer compression to scrolling.
 - **Orientation:** portrait maximizes vertical fan room; landscape has wider columns but shorter height → compression engages sooner. Layout recomputes on `GeometryReader` size change; no separate code paths beyond the shared formula.
+- **Spread (iPad):** ten columns want a wide, short area, so the formula above leaves an iPad — a 4:3 container, and in portrait the tall way — with the whole board in a band across the top. `BoardLayout.Spread.roomy` scales the base peeks up until a *nominal* deep column (16 cards, 7 face-down) fills the region, capped at 2×. It is measured against that fixed column and not the current board, so the fan holds still as columns grow; and because compression solves for "exactly fills the region" from either starting fan, a board deep enough to compress is laid out identically with or without it. `.compact` — the default, and what every iPhone gets — has a ceiling of 1, so it is exactly the tuned phone design. The spread is chosen by **idiom, not container size**: a phone in portrait has just as much proportional slack and is deliberately left alone.
+- **Chrome scale:** the bars are the one part of the screen not derived from their container — a HUD that grew with the window would swallow an iPad's height — so `Chrome` multiplies the iPhone-tuned point metrics and steps the text styles up. Its signal is the **size-class pair**: only regular-by-regular gets the iPad design, since an iPhone Pro Max in landscape is wider than an iPad mini in portrait but far shorter, and an iPad in Slide Over or a narrow pane should get the compact one.
 - Respect safe-area insets (notch / home indicator); HUD and ControlBar sit outside the tableau region.
 
 ## 6. Input & Gestures
@@ -131,7 +133,7 @@ Only face-up cards that head a valid movable run are interactive; tapping/draggi
 
 ## 11. Acceptance Criteria
 
-- [ ] All 10 columns, HUD, and controls are visible without whole-screen scrolling on the smallest supported iPhone in both orientations.
+- [x] All 10 columns, HUD, and controls are visible without whole-screen scrolling on the smallest supported iPhone and on every iPad size, in both orientations.
 - [ ] A long column compresses peeks to fit; only if minimum peeks overflow does the tableau region scroll.
 - [ ] `BoardLayout` unit tests: card size, peeks, and column heights are correct for representative container sizes and column counts (no SwiftUI needed).
 - [ ] Tap under threshold routes to `session.tap`; movement at/over threshold initiates a drag.
@@ -147,7 +149,7 @@ Only face-up cards that head a valid movable run are interactive; tapping/draggi
 ## 12. Open Questions / Action Items
 
 - **AI-1:** Pin card aspect ratio and min/max card width once the CC0 deck is chosen (PRD action item).
-- **AI-2:** Confirm drag `minimumDistance` threshold and touch-offset feel on device.
+- **AI-2:** Confirm drag `minimumDistance` threshold and touch-offset feel on device — including on iPad, where the cards are two to three times larger and 8pt is a proportionally smaller slop.
 - ~~**AI-3:** Decide stock visual~~ — **resolved**: face-down deck graphic in the HUD's right zone, stack depth = deals remaining, tap to deal.
 
 ## 13. PRD Traceability
@@ -157,6 +159,6 @@ Only face-up cards that head a valid movable run are interactive; tapping/draggi
 | Input & Interaction (single-tap, drag, no feedback) | §6 |
 | Screens → Game Board | §4, §7 |
 | Visual Assets (vector deck, fixed back, no theming) | §9 |
-| Platform & Scope (iPhone, both orientations, all sizes) | §5 |
+| Platform & Scope (iPhone + iPad, all orientations, all sizes) | §5 |
 | Game State & Lifecycle (new-game confirmation, pause) | §6.3, §8 |
 | Timing (live MM:SS, pause/resume) | §7, §8 |

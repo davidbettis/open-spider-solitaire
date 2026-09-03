@@ -21,7 +21,8 @@ struct ClearedRunLayer: View {
     var body: some View {
         ZStack(alignment: .topLeading) {
             ForEach(Array(run.cards.enumerated()), id: \.element.id) { position, card in
-                CardView(card: card, size: layout.cardSize)
+                CardView(card: card, size: layout.cardSize,
+                         isCovered: position < run.cards.count - 1)
                     .offset(x: layout.columnX(run.column) + (away ? drift(position) : 0),
                             y: away ? -layout.cardSize.height * 1.4
                                     : layout.topInset + CGFloat(position) * layout.faceUpPeek)

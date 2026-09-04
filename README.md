@@ -5,7 +5,7 @@ A Spider Solitaire game for iPhone and iPad that works entirely offline.
 ## Principles
 
 - **Free.** Open Spider Solitaire is free to use with no ads, subscriptions, or in-app purchases.
-- **Open.** The source code is open, under the MIT license. It is one Swift app target with no third-party dependencies, and a spec in `docs/` for every feature in it.
+- **Open.** The source code is open, under the Mozilla Public License 2.0. It is one Swift app target with no third-party dependencies, and a spec in `docs/` for every feature in it.
 - **Offline.** The app makes no network connections of any kind. It contains no networking code, no analytics libraries, and no advertising SDKs, and it behaves identically in airplane mode.
 - **Your data.** Your games and scores live in a sandboxed folder on your device. There are no accounts, no cloud services we operate, no iCloud sync, and no way for us to see anything you do.
 
@@ -103,4 +103,17 @@ Open Spider Solitaire collects no data at all. See [the privacy policy](docs/PRI
 
 ## License
 
-MIT. See [LICENSE](LICENSE).
+Copyright (C) 2026 David Bettis.
+
+This Source Code Form is subject to the terms of the Mozilla Public License,
+v. 2.0. If a copy of the MPL was not distributed with this file, You can obtain
+one at <https://mozilla.org/MPL/2.0/>.
+
+That notice covers every file in this repository. MPL 2.0 expressly allows the
+notice to live in one place a recipient would look, rather than at the top of
+each source file (see Exhibit A in [LICENSE](LICENSE)), so the sources carry no
+per-file header.
+
+MPL 2.0 is file-level copyleft: changes to these files stay open, while the
+license does not reach across into code merely combined with them. That keeps
+the project shippable on the App Store, which a GPL license would not.

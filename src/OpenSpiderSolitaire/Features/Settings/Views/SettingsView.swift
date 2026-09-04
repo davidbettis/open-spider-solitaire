@@ -1,9 +1,9 @@
 import SwiftUI
 
-/// Settings: difficulty for the next game, and the app's appearance.
+/// Settings: difficulty for the next game, the app's appearance, and About.
 ///
 /// Both write through immediately (``SettingsStore`` persists on every change),
-/// so there is no Save button and nothing to discard.
+/// so there is no Save button and nothing to discard. About is read-only.
 struct SettingsView: View {
     @Environment(SettingsStore.self) private var store
     @Environment(\.chrome) private var chrome
@@ -37,6 +37,26 @@ struct SettingsView: View {
                 Text("Appearance")
             } footer: {
                 Text("System follows your device's light or dark setting.")
+            }
+
+            Section {
+                LabeledContent("Version", value: AppInfo.versionString())
+
+                // Dropped rather than force-unwrapped if the URL ever fails to
+                // parse; `AppInfoTests` is what stops that reaching a build.
+                if let homepage = AppInfo.homepage {
+                    Link(destination: homepage) {
+                        LabeledContent("Website") {
+                            Image(systemName: "arrow.up.right")
+                        }
+                    }
+                }
+            } header: {
+                Text("About")
+            } footer: {
+                // The app still makes no network connections of its own: the
+                // URL is handed to the browser, which is the one that connects.
+                Text("Opens in your browser.")
             }
         }
         // Matches the high-score table: full-width rows holding one picker

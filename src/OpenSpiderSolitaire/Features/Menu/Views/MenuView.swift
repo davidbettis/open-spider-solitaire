@@ -10,6 +10,10 @@ import SwiftUI
 /// platform and the user's appearance setting.
 struct MenuView: View {
     let onStart: () -> Void
+    /// Resume the game waiting behind this screen, or `nil` when there is none.
+    /// Optional rather than a flag, so "no game in flight" cannot render a
+    /// button that would do nothing.
+    let onContinue: (() -> Void)?
     let onSettings: () -> Void
     let onHighScores: () -> Void
 
@@ -59,13 +63,22 @@ struct MenuView: View {
         }
     }
 
-    /// Start Game is prominent; the other two are peers below it.
+    /// Start Game is prominent; the rest are peers below it. Continue sits
+    /// directly under Start Game rather than with Settings and High Scores,
+    /// because it is a way into a game and those are not.
     private var actions: some View {
         VStack(spacing: 12 * chrome.scale) {
             Button(action: onStart) {
                 Text("Start Game").fontWeight(.semibold).frame(maxWidth: columnWidth).padding(.vertical, 6 * chrome.scale)
             }
             .buttonStyle(.borderedProminent)
+
+            if let onContinue {
+                Button(action: onContinue) {
+                    Text("Continue Game").frame(maxWidth: columnWidth).padding(.vertical, 6 * chrome.scale)
+                }
+                .buttonStyle(.bordered)
+            }
 
             Button(action: onSettings) {
                 Text("Settings").frame(maxWidth: columnWidth).padding(.vertical, 6 * chrome.scale)
@@ -90,8 +103,14 @@ struct MenuView: View {
     }
 }
 
-#Preview {
+#Preview("No game in flight") {
     NavigationStack {
-        MenuView(onStart: {}, onSettings: {}, onHighScores: {})
+        MenuView(onStart: {}, onContinue: nil, onSettings: {}, onHighScores: {})
+    }
+}
+
+#Preview("Game in flight") {
+    NavigationStack {
+        MenuView(onStart: {}, onContinue: {}, onSettings: {}, onHighScores: {})
     }
 }

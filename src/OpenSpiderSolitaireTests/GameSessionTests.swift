@@ -115,6 +115,45 @@ import Testing
         #expect(session.elapsed == frozen)                        // no longer ticking
     }
 
+    @Test func suspendingToTheMenuFreezesTheClockAndTheSnapshot() {
+        // Back to the title screen suspends rather than ends: the clock stops
+        // (the menu is not play time) and the snapshot written on the way out
+        // carries the frozen time, not the time the player spent deciding.
+        let clock = FakeClock(0)
+        let session = GameSession(resuming: makeState(board: twoColumnBoard()), clock: clock)
+        _ = session.move(from: 0, index: 1, to: 1)      // starts the timer at t=0
+        clock.now = 30
+
+        session.pause()                                 // what leaving the board does
+        let saved = session.snapshot
+        clock.now = 300                                 // five minutes on the menu
+        #expect(session.elapsed == 30)
+        #expect(saved.elapsed == 30)
+
+        session.resume()                                // Continue Game
+        clock.now = 310
+        #expect(session.elapsed == 40)
+    }
+
+    @Test func continuingAfterAQuitPicksUpTheSuspendedGame() throws {
+        // The snapshot written on the way to the menu is the one a relaunch
+        // resumes, so Continue and a cold launch land on the same board.
+        let clock = FakeClock(0)
+        let session = GameSession(resuming: makeState(board: twoColumnBoard()), clock: clock)
+        _ = session.move(from: 0, index: 1, to: 1)
+        clock.now = 45
+        session.pause()
+
+        let data = try JSONEncoder().encode(session.snapshot)
+        let decoded = try JSONDecoder().decode(GameState.self, from: data)
+        let relaunched = GameSession(resuming: decoded, clock: FakeClock(1_000))
+
+        #expect(relaunched.state.board == session.state.board)
+        #expect(relaunched.elapsed == 45)               // resumes from the frozen time
+        #expect(relaunched.state.moveCount == 1)
+        #expect(relaunched.canUndo)
+    }
+
     @Test func resumePreservesStateRoundTrip() throws {
         let session = GameSession(resuming: makeState(board: twoColumnBoard()), clock: FakeClock(0))
         _ = session.move(from: 0, index: 1, to: 1)

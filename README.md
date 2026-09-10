@@ -16,7 +16,9 @@ A Spider Solitaire game for iPhone and iPad that works entirely offline.
 - **Unlimited undo** back to the first move.
 - **Free hints.** Step through every legal move on the board. Hints cost time but no points.
 - **Auto-complete** when only mechanical moves remain, at no point cost.
-- **Resume.** Quit mid-game and the board, score, and clock come back exactly as you left them.
+- **Resume.** Leave a game — back to the title screen, or quit the app entirely — and the
+  board, score, and clock come back exactly as you left them. **Continue Game** appears on
+  the title screen whenever a game is waiting, and the clock stops while it waits.
 - **High scores** per difficulty, ranked by score and then by time, with a time to beat.
 - **Light and dark**, following your device or forced either way in Settings.
 - **iPhone and iPad**, in portrait and landscape. There is no separate iPad

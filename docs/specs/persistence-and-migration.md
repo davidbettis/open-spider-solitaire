@@ -63,7 +63,8 @@ struct PersistedEnvelope<Body: Codable>: Codable {
 ### 6.1 Save triggers (game snapshot)
 - **Debounced autosave** after each committed engine action (move/deal/undo/auto-complete) — coalesced (e.g., ~0.5 s) to avoid churn during rapid play.
 - **Immediate synchronous-enough save** on `scenePhase` → `.inactive`/`.background` (the reliable "app is leaving" signal on iOS) and before `newGame`.
-- **Delete** the snapshot on **win** and on confirmed **new game** (the old in-progress game is gone).
+- **Immediate save on leaving the board for the menu.** Back does not end the game: the session is paused (the menu is not play time — PRD Timing) and its snapshot written synchronously, so the board survives both the trip to the title screen and a quit from there. The debounced autosave is not relied on for this, since the player may leave within the coalescing window.
+- **Delete** the snapshot on **win**, and on a confirmed **new game** from either the board or the title screen (the old in-progress game is gone). The title-screen case matters on its own: a fresh game writes nothing until its first move, so without the delete a quit in between would resume the game the player just replaced.
 
 ### 6.2 Save triggers (durable)
 - On high-score insert, stats change, or settings change (infrequent → save immediately).
@@ -71,9 +72,17 @@ struct PersistedEnvelope<Body: Codable>: Codable {
 ### 6.3 Load (launch)
 1. Read the durable envelope; migrate if needed (§7); on unrecoverable failure, reset to defaults.
 2. Read the game snapshot envelope if present; migrate if needed; on unrecoverable failure, delete it and start with no resumable game.
-3. Hand the (possibly nil) restored `GameState` to the app shell, which either resumes via `GameSession(resuming:)` or shows the menu.
+3. Hand the (possibly nil) restored `GameState` to the app shell, which either resumes via `GameSession(resuming:)` or shows the menu. A launch with a snapshot still goes **straight to the board**, so a returning player is not asked to confirm what they were doing.
 
-### 6.4 Atomicity
+### 6.4 Suspend and continue
+Leaving the board is a suspension, not an ending. `RootView` keeps two pieces of state: `game`, the session in flight whether or not it is on screen, and `isPlaying`, whether it is the screen right now — `game != nil && !isPlaying` is a board waiting behind the title screen.
+
+- The title screen offers **Continue Game**, directly under Start Game, exactly when a game is waiting; it is absent otherwise, expressed as an optional closure so "no game" cannot render a dead button.
+- Continue resumes the clock and returns to the same session in memory — no decode round trip — while the snapshot written on the way out is what a *relaunch* resumes. The two agree because the save is taken at the moment of suspending.
+- A **won** game is not suspended: there is nothing to continue, and its snapshot is already deleted, so it is dropped and Continue does not appear.
+- **Start Game** while a game is waiting discards it, so the title screen asks for confirmation the same way the board does.
+
+### 6.5 Atomicity
 - File writes go to a temp file then atomically replace the target (`Data.write(to:options:.atomic)`), so a crash mid-write never leaves a half-written save — the previous good save survives.
 
 ## 7. Migration
@@ -129,7 +138,10 @@ Any of: unreadable file, JSON decode error, unknown/newer version, failed migrat
 
 - [x] A mid-game `GameState` (non-empty `undoStack`, non-zero `elapsed`) saved then loaded is byte-for-value identical.
 - [x] Killing the app during play and relaunching resumes the exact board, score, undo depth, and elapsed time — verified in the simulator: after a kill, a relaunch with no autostart came back to a pixel-identical tableau at the same score.
-- [x] Winning or confirming a new game deletes the in-progress snapshot; next launch shows no resumable game.
+- [x] Winning or confirming a new game — from the board or the title screen — deletes the in-progress snapshot; next launch shows no resumable game.
+- [x] Returning to the title screen preserves the game: the clock stops, the snapshot written on the way out carries the frozen time, and both Continue and a relaunch come back to the same board (`GameSessionTests`).
+- [x] **Continue Game** is on the title screen exactly when a game is waiting, and absent otherwise — verified in the simulator, both states. It does not appear after a win.
+- [ ] *Not exercised by touch:* the back button and Continue themselves are only reachable by tapping, which this environment cannot do (see the `simulator-verification` note). Both states were rendered by forcing them; the taps that reach them were not.
 - [x] Durable data survives a full restart.
 - [x] A save file with `schemaVersion` below current is migrated stepwise and decodes correctly — `GameStateV1ToV2` is a real migration, not a placeholder: v2 added `initialBoard`, and a v1 save has none.
 - [x] A corrupt/truncated file, well-formed JSON of the wrong shape, a newer version, a missing migration step, and a throwing migration each fall back cleanly with no crash.

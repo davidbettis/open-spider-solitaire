@@ -133,7 +133,7 @@ Persisted locally, tracked **separately per suit mode**, as a **top-N leaderboar
 
 ## Game State & Lifecycle
 
-- **Resume in progress:** a mid-game exit (quit, call, backgrounding) preserves full game state — tableau, stock, score, undo stack, and elapsed time — and restores it on return.
+- **Resume in progress:** a mid-game exit — quit, call, backgrounding, or returning to the title screen — preserves full game state (tableau, stock, score, undo stack, and elapsed time) and restores it on return. Leaving for the title screen is a **suspension, not an ending**: the title screen offers **Continue Game** while a game is waiting, and hides it otherwise. The state is cleared when the game is won or a new game is started.
 - **New-game confirmation:** starting a new game while one is in progress prompts for confirmation.
 
 ## Accessibility

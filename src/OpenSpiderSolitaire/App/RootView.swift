@@ -1,9 +1,12 @@
 import SwiftUI
 
 /// Type-safe navigation routes (retained for later app-shell screens).
+///
+/// High Scores carries an optional row to open on and call out: the title
+/// screen pushes it empty, a win pushes the row it just earned.
 enum Route: Hashable {
     case game
-    case highScores
+    case highScores(HighScoreHighlight?)
     case settings
 }
 
@@ -49,16 +52,16 @@ struct RootView: View {
     var body: some View {
         Group {
             if let game {
-                GameBoardView(persistence: persistence, onExit: { self.game = nil })
+                GameBoardView(persistence: persistence, onExit: leaveGame)
                     .environment(game)
             } else {
                 NavigationStack(path: $path) {
                     MenuView(onStart: startGame,
                              onSettings: { path.append(.settings) },
-                             onHighScores: { path.append(.highScores) })
+                             onHighScores: { path.append(.highScores(nil)) })
                         .navigationDestination(for: Route.self) { route in
                             switch route {
-                            case .highScores: HighScoresView()
+                            case .highScores(let highlight): HighScoresView(highlight: highlight)
                             case .settings: SettingsView()
                             case .game: EmptyView()
                             }
@@ -76,6 +79,16 @@ struct RootView: View {
         // iPad changes with multitasking, not the device it is installed on.
         .environment(\.chrome, Chrome(horizontal: horizontalSizeClass,
                                       vertical: verticalSizeClass))
+    }
+
+    /// Leave the board. A win that made the leaderboard hands back its row, and
+    /// lands on High Scores showing it — the title screen would otherwise be the
+    /// last thing between the player and a result they just earned. The stack is
+    /// set before the board goes away, so the screen is already there rather
+    /// than sliding in over the menu.
+    private func leaveGame(showing highlight: HighScoreHighlight?) {
+        path = highlight.map { [Route.highScores($0)] } ?? []
+        game = nil
     }
 
     /// Difficulty comes from Settings, not from the caller: the title screen no

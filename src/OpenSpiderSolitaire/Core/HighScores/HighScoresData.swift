@@ -34,4 +34,8 @@ struct WinSummary: Hashable, Sendable {
     let placement: Placement
     /// The time to beat *after* this game was recorded.
     let newTimeToBeat: TimeInterval?
+    /// The row this win left on the leaderboard, or `nil` if it missed the top
+    /// N. Carried so the win screen can send the player to that exact row
+    /// rather than to the title screen (spec §9).
+    let recordedEntry: ScoreEntry?
 }

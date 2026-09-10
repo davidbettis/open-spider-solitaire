@@ -3,11 +3,22 @@ import SwiftUI
 /// Per-mode top-10 leaderboard with the mode's time-to-beat and stats
 /// (spec §9). Rows show the score and the time from that same game.
 struct HighScoresView: View {
+    /// A row just earned, to open on and call out in red. `nil` when the screen
+    /// is reached from the title screen, which has no row to point at.
+    let highlight: HighScoreHighlight?
+
     @Environment(HighScoresStore.self) private var store
     @Environment(\.chrome) private var chrome
 
-    @State private var mode: SuitMode = .one
+    @State private var mode: SuitMode
     @State private var confirmingReset = false
+
+    init(highlight: HighScoreHighlight? = nil) {
+        self.highlight = highlight
+        // The highlighted row is on its own mode's board, so that is the one
+        // worth landing on; without one, the easiest mode leads as before.
+        _mode = State(initialValue: highlight?.mode ?? .one)
+    }
 
     private var leaderboard: Leaderboard { store.leaderboard(mode) }
     private var stats: ModeStats { store.stats(mode) }
@@ -80,28 +91,48 @@ struct HighScoresView: View {
     }
 
     private var table: some View {
-        ScrollView {
-            VStack(spacing: 0) {
-                ForEach(Array(leaderboard.entries.enumerated()), id: \.offset) { rank, entry in
-                    row(rank: rank + 1, entry: entry)
-                    if rank + 1 < leaderboard.entries.count {
-                        Divider()
+        // A ten-row table does not all fit in a compact landscape window, so a
+        // called-out row is scrolled to rather than left below the fold.
+        ScrollViewReader { proxy in
+            ScrollView {
+                VStack(spacing: 0) {
+                    ForEach(Array(leaderboard.entries.enumerated()), id: \.offset) { rank, entry in
+                        row(rank: rank + 1, entry: entry)
+                            .id(rank + 1)
+                        if rank + 1 < leaderboard.entries.count {
+                            Divider()
+                        }
                     }
                 }
+                .background(Palette.bar, in: RoundedRectangle(cornerRadius: 12))
+                .padding(.horizontal)
             }
-            .background(Palette.bar, in: RoundedRectangle(cornerRadius: 12))
-            .padding(.horizontal)
+            .onAppear {
+                guard let rank = highlightedRank else { return }
+                proxy.scrollTo(rank, anchor: .center)
+            }
         }
     }
 
+    /// Rank of the called-out row on the mode currently shown, if it is here at
+    /// all — switching the picker to another mode leaves nothing to point at.
+    private var highlightedRank: Int? {
+        guard let highlight, highlight.mode == mode else { return nil }
+        return leaderboard.entries.firstIndex(of: highlight.entry).map { $0 + 1 }
+    }
+
     private func row(rank: Int, entry: ScoreEntry) -> some View {
-        HStack {
+        let isHighlighted = rank == highlightedRank
+        return HStack {
             Text("\(rank)")
                 .font(.subheadline.monospacedDigit().weight(rank == 1 ? .bold : .regular))
                 .foregroundStyle(rank == 1 ? AnyShapeStyle(.primary) : AnyShapeStyle(.secondary))
                 .frame(width: 28, alignment: .leading)
+            // The score the player just earned is called out in red, so they
+            // can find their own result in the table at a glance.
             Text("\(entry.score)")
                 .font(.title3.monospacedDigit().weight(.semibold))
+                .foregroundStyle(isHighlighted ? Color.red : Color.primary)
             Spacer()
             VStack(alignment: .trailing, spacing: 1) {
                 Text(entry.time.clockString)

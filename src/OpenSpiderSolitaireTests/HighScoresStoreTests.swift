@@ -45,6 +45,38 @@ struct HighScoresStoreTests {
         #expect(store.leaderboard(.one).entries.first?.score == 0)
     }
 
+    @Test("A win that makes the board carries the row it left there")
+    func summaryCarriesTheRecordedRow() {
+        let (store, _) = store()
+        let date = Date(timeIntervalSince1970: 1_000)
+        let summary = store.recordWin(mode: .two, score: 640, time: 372, date: date)
+
+        #expect(summary.placement.madeLeaderboard)
+        #expect(summary.recordedEntry == ScoreEntry(score: 640, time: 372, date: date))
+        // The very row that is on the board, so the screen can match it by value.
+        #expect(store.leaderboard(.two).entries.first == summary.recordedEntry)
+    }
+
+    @Test("The recorded row carries the floored score, not the raw one")
+    func recordedRowIsFloored() {
+        let (store, _) = store()
+        let summary = store.recordWin(mode: .one, score: -50, time: 200)
+        #expect(summary.recordedEntry?.score == 0)
+    }
+
+    @Test("A finish that misses the top ten carries no row")
+    func summaryOmitsRowWhenBoardIsMissed() {
+        let (store, _) = store()
+        for _ in 0..<Leaderboard.maxEntries {
+            store.recordWin(mode: .one, score: 900, time: 100)
+        }
+        let summary = store.recordWin(mode: .one, score: 10, time: 999)
+
+        #expect(!summary.placement.madeLeaderboard)
+        #expect(summary.recordedEntry == nil)
+        #expect(store.leaderboard(.one).entries.count == Leaderboard.maxEntries)
+    }
+
     @Test("The summary reports the time to beat after this game")
     func summaryCarriesNewTimeToBeat() {
         let (store, _) = store()

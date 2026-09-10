@@ -100,7 +100,7 @@ struct HighScoresData: Codable, Sendable {
 On a win, the engine/session provides `(mode, flooredScore, elapsed)`. This module:
 1. Increments `gamesWon[mode]`.
 2. Inserts a `ScoreEntry(score, time, date: .now)` → `Placement`.
-3. Returns a `WinSummary { flooredScore, time, placement, newTimeToBeat }` for the Win screen ([`animations`](./animations.md) renders the cascade; this supplies the numbers and "records beaten" flags).
+3. Returns a `WinSummary { flooredScore, time, placement, newTimeToBeat, recordedEntry }` for the Win screen ([`animations`](./animations.md) renders the cascade; this supplies the numbers and "records beaten" flags). `recordedEntry` is the `ScoreEntry` that survived truncation, or `nil` when the finish missed the top N — it identifies the row the High Scores screen calls out (§9).
 
 ## 8. Reset
 
@@ -111,6 +111,7 @@ On a win, the engine/session provides `(mode, flooredScore, elapsed)`. This modu
 
 - **High Scores screen:** a segmented control or list sectioned by mode; each section shows the mode's top-N rows (`rank · score · time · date`), the current time-to-beat, and stats (games won, win rate). Empty modes show a friendly empty state.
 - **Win screen summary region:** final score, final time, and which records were beaten (from `Placement`).
+- **Leaving a win that placed** goes to the High Scores screen rather than the title screen, opened on the mode just played, with that game's **score drawn in red**. The screen takes an optional `HighScoreHighlight { mode, entry }` (nil from the title screen) and matches the row by value, so it calls out the one game and not merely the same number. Because ten rows do not all fit in a compact landscape window, the called-out row is scrolled into view. A finish that missed the top N has no row to show and goes to the title screen as before.
 
 ## 10. Architecture & Concurrency
 
@@ -139,6 +140,8 @@ On a win, the engine/session provides `(mode, flooredScore, elapsed)`. This modu
 - [x] `Placement` correctly reports `madeLeaderboard`, `rank`, `isNewBest`, and beat-previous-best flags across representative wins.
 - [x] `gamesStarted` increments once per started game; `gamesWon` on each win; `winRate` computes correctly, and 0 started ⇒ 0 rate (no divide-by-zero).
 - [x] `resetAll()` clears leaderboards and stats for all modes and persists; only fires after confirmation.
+- [x] `WinSummary.recordedEntry` carries the stored row when the win places, and is nil when it misses the top N.
+- [x] A win that places leaves the game screen on High Scores, opened on that mode, with that row's score in red; one that misses goes to the title screen. Verified in the simulator, light and dark.
 - [x] Data survives app restart — verified in the simulator by reading a leaderboard written by an earlier process. **Caveat:** `UserDefaults.set` is asynchronous, so a win recorded moments before a hard kill can be lost. The persistence spec's atomic write plus its save-on-`.background` trigger (§6.2/§6.4) is the fix; until then this is a known, narrow gap.
 
 ## 12. Testing Strategy

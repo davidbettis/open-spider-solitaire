@@ -47,12 +47,16 @@ final class HighScoresStore {
         data.stats[mode] = updatedStats
 
         var board = leaderboard(mode)
-        let placement = board.insert(ScoreEntry(score: floored, time: time, date: date))
+        let entry = ScoreEntry(score: floored, time: time, date: date)
+        let placement = board.insert(entry)
         data.leaderboards[mode] = board
 
         persist()
         return WinSummary(flooredScore: floored, time: time,
-                          placement: placement, newTimeToBeat: board.timeToBeat)
+                          placement: placement, newTimeToBeat: board.timeToBeat,
+                          // Only a row that survived truncation is on the board
+                          // to be shown, so a missed finish carries nothing.
+                          recordedEntry: placement.madeLeaderboard ? entry : nil)
     }
 
     /// Clear every mode's leaderboard and stats. The UI gates this behind a

@@ -32,7 +32,9 @@ struct GameBoardView: View {
     @State private var dealingIn: [Card]?
 
     let persistence: PersistenceService
-    let onExit: () -> Void
+    /// Leave the board. The win screen passes the leaderboard row this game
+    /// earned so the player lands on it; the HUD's mid-game exit passes `nil`.
+    let onExit: (HighScoreHighlight?) -> Void
 
     var body: some View {
         boardStack
@@ -86,7 +88,7 @@ struct GameBoardView: View {
     private var boardStack: some View {
         VStack(spacing: 0) {
             HUDBar(session: session, nextDeal: cardsAtDeck,
-                   cardNamespace: cardNamespace, onExit: onExit, onDeal: deal)
+                   cardNamespace: cardNamespace, onExit: { onExit(nil) }, onDeal: deal)
             tableauArea
             ControlBar(session: session,
                        confirmingNewGame: $confirmingNewGame,
@@ -116,9 +118,19 @@ struct GameBoardView: View {
                 Color.black.opacity(0.5)
                 WinCascadeLayer(completedRuns: session.state.board.completedRuns,
                                 cardSize: cascadeCardSize)
-                WinOverlay(session: session, summary: winSummary, onExit: onExit)
+                WinOverlay(session: session, summary: winSummary,
+                           onExit: { onExit(earnedHighlight) })
             }
             .ignoresSafeArea()
+        }
+    }
+
+    /// The row this win put on the leaderboard, if it made the top N — what
+    /// leaving the win screen hands back. A finish that missed the board has
+    /// nothing to show, so it goes to the menu as before.
+    private var earnedHighlight: HighScoreHighlight? {
+        winSummary?.recordedEntry.map {
+            HighScoreHighlight(mode: session.state.mode, entry: $0)
         }
     }
 

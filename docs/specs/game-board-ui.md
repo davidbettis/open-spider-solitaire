@@ -91,6 +91,15 @@ A single `DragGesture(minimumDistance: k)` per movable card region:
 
 Only face-up cards that head a valid movable run are interactive; tapping/dragging a face-down card or a non-run card is inert (no feedback — US-4).
 
+### 6.1.1 The column strip as a tap target
+The bare strip below a column's fan takes a **tap** for that column's **top card** — the same move as tapping the card itself, since it routes to `session.tap(column:, index: cards.count - 1)`.
+
+- **Why:** ten columns on a phone leave each card ~34pt wide, under the 44pt a fingertip wants, and the fan occupies only the top of a full-height column — a phone's opening deal leaves roughly four fifths of each column bare. That bare run was the largest, easiest region of the board and did nothing. This turns the top card's target from one card into the whole column without changing what any card does.
+- **Hit-testing does the disambiguation.** The strip is the ZStack's first child, so it only ever receives what falls through the cards drawn over it. Columns never overlap at rest (`TableauView`'s `HStack` spaces them by the gutter), so a strip is exactly its own column.
+- **Tap only — no drag.** The strip does not begin a drag, because there is nothing under the finger to pick up: dragging from bare board and having a card leap out of the fan to follow it would be a surprise, not a shortcut. Drags still start on cards.
+- **Degenerate cases are inert, not special-cased:** an empty column asks for index `-1` and a face-down top is not a movable run; `Rules.autoMoveDestination` refuses both.
+- **Known trade-off:** the strip is painted the same colour as the tableau region (deliberately, so gutters do not read as stripes), so the enlarged target has **no visual affordance** — it is discovered by accident or not at all. And since a move costs a point and undoing costs another, a stray tap on bare board now costs two points where it previously cost nothing.
+
 ### 6.2 Drag-and-drop
 1. **Pick up:** on drag begin over card at `(column, index)`, if `index...top` is a valid movable run (engine `Rules.topRun`/validation), capture it into `DragState { sourceColumn, indexRange, cards, touchOffset }`; hide those cards in place; render them in the `DragLayer` overlay following the touch.
 2. **Track:** the dragged run follows the finger in a global coordinate space.
@@ -137,6 +146,8 @@ Only face-up cards that head a valid movable run are interactive; tapping/draggi
 - [ ] A long column compresses peeks to fit; only if minimum peeks overflow does the tableau region scroll.
 - [ ] `BoardLayout` unit tests: card size, peeks, and column heights are correct for representative container sizes and column counts (no SwiftUI needed).
 - [ ] Tap under threshold routes to `session.tap`; movement at/over threshold initiates a drag.
+- [x] A tap on the bare column strip plays that column's top card; an empty column and a face-down top are inert (`BoardInteractionTests`). *Not exercised by touch — the strip's hit-testing is only reachable by tapping, which this environment cannot do; the board was checked for visual regression only.*
+- [x] A drag begun on the bare strip picks up nothing.
 - [ ] Dragging a valid run and dropping on a legal column calls `session.move` and the move commits; dropping on an illegal/empty target snaps back with no state change and no error.
 - [ ] Face-down and non-run cards are inert.
 - [x] Deal indicator triggers `session.deal()`; it is greyed only when the stock is spent, and a deal refused by an empty column flashes that column red.

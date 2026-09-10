@@ -28,6 +28,37 @@ import Testing
         #expect(interaction.drag == nil)
     }
 
+    // MARK: The column strip's tap target
+
+    @Test func strippedTapPlaysTheTopCard() {
+        // The strip taps `count - 1`, so it plays the column's top card and
+        // only that card — the same move tapping the card itself makes.
+        let s = session()
+        #expect(s.tap(column: 0, index: s.state.board.tableau[0].count - 1))
+        #expect(s.state.board.tableau[0].map(\.rank) == [.four])       // 6♠ left
+        #expect(s.state.board.tableau[1].map(\.rank) == [.seven, .six])
+    }
+
+    @Test func strippedTapOnAnEmptyColumnIsInert() {
+        // An empty column asks for index -1. That must be a silent no-op rather
+        // than a crash or a move, since the whole strip is now tappable.
+        let s = session()
+        let before = s.state.board
+        #expect(!s.tap(column: 9, index: -1))                          // col 9 is empty
+        #expect(s.state.board == before)
+        #expect(s.state.moveCount == 0)
+    }
+
+    @Test func strippedTapWithAFaceDownTopIsInert() {
+        var board = emptyBoard()
+        board.tableau[0] = [makeCard(0, .six, .spades, up: false)]
+        board.tableau[1] = [makeCard(1, .seven, .hearts)]
+        let s = GameSession(resuming: makeState(board: board), clock: FakeClock())
+        let before = s.state.board
+        #expect(!s.tap(column: 0, index: 0))
+        #expect(s.state.board == before)
+    }
+
     @Test func dropOnColumnMovesTheRun() {
         let s = session()
         let interaction = BoardInteraction()

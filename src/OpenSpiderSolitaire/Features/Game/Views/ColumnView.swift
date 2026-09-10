@@ -2,7 +2,8 @@ import SwiftUI
 
 /// One tableau column: cards fanned by ``BoardLayout`` offsets, with a
 /// full-strip background so it reads as a column and provides a stable drop
-/// frame. Each card handles tap (auto-move) and drag (explicit target).
+/// frame. Each card handles tap (auto-move) and drag (explicit target), and the
+/// strip below them takes a tap for the column's top card (see ``stripTap``).
 struct ColumnView: View {
     let index: Int
     let cards: [Card]
@@ -23,6 +24,7 @@ struct ColumnView: View {
             RoundedRectangle(cornerRadius: layout.cardSize.width * 0.12)
                 .fill(Palette.columnStrip)
                 .frame(width: layout.cardSize.width, height: regionHeight)
+                .onTapGesture(perform: stripTap)
 
             ForEach(Array(cards.enumerated()), id: \.element.id) { position, card in
                 cardView(card, at: position)
@@ -58,6 +60,30 @@ struct ColumnView: View {
             .animation(.easeInOut(duration: 0.15).repeatCount(5, autoreverses: true),
                        value: isBlocked)
             .allowsHitTesting(false)
+    }
+
+    /// A tap on the bare strip plays the column's **top card**, exactly as
+    /// tapping that card does.
+    ///
+    /// The strip sits under the cards, so this only ever receives what falls
+    /// through them — the run of empty column below the fan, which is most of
+    /// the column for most of a game (a phone's opening deal leaves roughly four
+    /// fifths of it bare). That turns the top card's target from one card into
+    /// the whole column, which matters on a phone, where ten columns leave each
+    /// card narrower than the 44pt a fingertip wants.
+    ///
+    /// **Tap only, deliberately.** The card gestures pick up a run on a drag;
+    /// the strip does not, because there is nothing under the finger to pick up
+    /// — dragging from bare board and having a card leap out of the fan to
+    /// follow it would be a surprise, not a shortcut.
+    ///
+    /// Both degenerate cases are inert rather than special-cased: an empty
+    /// column asks for index `-1`, and a face-down top is not a movable run, and
+    /// ``Rules/autoMoveDestination(board:column:index:)`` refuses each.
+    private func stripTap() {
+        withAnimation(Motion.glide) {
+            _ = session.tap(column: index, index: cards.count - 1)
+        }
     }
 
     private func cardView(_ card: Card, at position: Int) -> some View {
